@@ -1,0 +1,2 @@
+name: Cairn 搜索
+description: 无固定角色的状态空间搜索：用 Fact/Intent/Hint 黑板从图上搜索 origin→goal 的路径，父会话调度，子代理并行探索。
