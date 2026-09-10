@@ -1,0 +1,8 @@
+.venv/
+.venv-mitm/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/
+*.egg-info/
+.DS_Store

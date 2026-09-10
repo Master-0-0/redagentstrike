@@ -1,0 +1,14 @@
+.DS_Store
+.pnpm-store/
+**/.env
+**/.env.local
+**/*.tsbuildinfo
+
+backend/.venv/
+backend/.venv-mitm/
+backend/data/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+
+**/node_modules/
