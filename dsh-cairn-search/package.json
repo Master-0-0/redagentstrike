@@ -1,0 +1,32 @@
+{
+  "name": "dsh-cairn-search",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fact-intent blackboard tools for the Cairn 搜索 DeepSeek Harness preset",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "link-peers": "node scripts/link-peers.mjs",
+    "postinstall": "node scripts/link-peers.mjs",
+    "test": "node --test --experimental-strip-types tests/*.test.ts"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh-tools": { "optional": true }
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "title": "Find why parseDuration rejects 1.5h",
+  "status": "active",
+  "bootstrapEnabled": false,
+  "facts": [
+    {
+      "id": "origin",
+      "description": "The workspace test suite reports one failing test: parseDuration rejects the string 1.5h."
+    },
+    {
+      "id": "goal",
+      "description": "Name the code path that rejects 1.5h and the exact check that fires."
+    },
+    {
+      "id": "f001",
+      "description": "parseDuration splits a trailing unit letter; 1.5h yields amount 1.5 and unit h."
+    }
+  ],
+  "intents": [
+    {
+      "id": "i001",
+      "from": ["origin"],
+      "to": "f001",
+      "description": "Trace parseDuration on input 1.5h and record the first branch taken.",
+      "creator": "parent",
+      "worker": null,
+      "createdAt": "2026-09-11T00:00:00.000Z",
+      "concludedAt": "2026-09-11T00:01:00.000Z"
+    },
+    {
+      "id": "i002",
+      "from": ["f001"],
+      "to": null,
+      "description": "Find the numeric validation that rejects a dotted amount.",
+      "creator": "parent",
+      "worker": "explore-i002",
+      "createdAt": "2026-09-11T00:02:00.000Z",
+      "concludedAt": null
+    }
+  ],
+  "hints": [
+    {
+      "id": "h001",
+      "content": "Prefer the parser module over the CLI wrapper; the CLI only forwards the string.",
+      "creator": "user",
+      "createdAt": "2026-09-11T00:00:30.000Z"
+    }
+  ],
+  "reason": {
+    "worker": "parent",
+    "trigger": "new-fact",
+    "startedAt": "2026-09-11T00:03:00.000Z"
+  },
+  "checkpoint": {
+    "factCount": 3,
+    "hintCount": 1,
+    "hadOpenIntents": true
+  }
+}
