@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BOARD_RELATIVE_PATH } from '../src/types.ts'
+import { boardRelativePath } from '../src/owner.ts'
 import { loadBoardSnapshot, type WorkspaceFilesReadRemote } from '../src/client/rpc.ts'
 import { emptyBoard, ensureBootstrapIntent } from '../src/board.ts'
 
@@ -18,7 +18,7 @@ test('loadBoardSnapshot pages until eof and lays out a valid board', async () =>
       eof: true,
     },
   ])
-  const result = await loadBoardSnapshot(remote, 'sess', new AbortController().signal)
+  const result = await loadBoardSnapshot(remote, 'sess', 'main-a', new AbortController().signal)
   assert.equal(result.kind, 'ready')
   if (result.kind === 'ready') assert.equal(result.view.title, 't')
 })
@@ -32,12 +32,12 @@ test('loadBoardSnapshot treats not-found as missing', async () => {
     },
   }
   assert.deepEqual(
-    await loadBoardSnapshot(remote, 'sess', new AbortController().signal),
+    await loadBoardSnapshot(remote, 'sess', 'main-a', new AbortController().signal),
     { kind: 'missing' },
   )
 })
 
-test('loadBoardSnapshot reads BOARD_RELATIVE_PATH', async () => {
+test('loadBoardSnapshot reads the owner-scoped board path', async () => {
   const paths: string[] = []
   const remote: WorkspaceFilesReadRemote = {
     workspaceFiles: {
@@ -47,8 +47,8 @@ test('loadBoardSnapshot reads BOARD_RELATIVE_PATH', async () => {
       },
     },
   }
-  await loadBoardSnapshot(remote, 'sess', new AbortController().signal)
-  assert.deepEqual(paths, [BOARD_RELATIVE_PATH])
+  await loadBoardSnapshot(remote, 'sess', 'main-a', new AbortController().signal)
+  assert.deepEqual(paths, [boardRelativePath('main-a')])
 })
 
 function fakeRead(

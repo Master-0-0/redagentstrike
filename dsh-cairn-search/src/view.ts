@@ -1,5 +1,5 @@
 /**
- * Parse `.dsh/blackboard.json` and place origin → fact → goal nodes for the sidebar graph.
+ * Parse a blackboard JSON snapshot and place origin → fact → goal nodes for the sidebar graph.
  * Domain mutations stay in `board.ts`; this module is read-only presentation.
  */
 
@@ -72,7 +72,7 @@ export type BoardRead =
 
 /**
  * Parse a workspace file body into a board. Unknown extra keys are ignored.
- * @param text - file contents of `.dsh/blackboard.json`.
+ * @param text - file contents of `.dsh/blackboards/<main-session-id>.json`.
  * @returns the board, or null when the JSON is not a board object.
  */
 export function parseBoard(text: string): Board | null {

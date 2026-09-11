@@ -1,13 +1,14 @@
 /**
- * Sidebar-foot blackboard entry: opens a graph of `.dsh/blackboard.json`
- * for the selected session's workspace, stacked above the subagent control.
+ * Sidebar-foot blackboard entry: opens a graph of the selected session's
+ * owned board (`.dsh/blackboards/<main-session-id>.json`), stacked above 子代理.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Tooltip,
   useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { boardOwnerFromList, type SessionLineage } from '../owner.ts'
 import type { BoardView } from '../view.ts'
 import { BlackboardGraph, selectedDetail } from './BlackboardGraph.tsx'
 import type { BoardSnapshot } from './rpc.ts'
@@ -15,15 +16,21 @@ import type { BoardSnapshot } from './rpc.ts'
 const PANEL_GAP = 8
 const POLL_MS = 1500
 
+export interface SessionListSlice {
+  current?: string
+  byId: Record<string, SessionLineage & { displayTitle?: string }>
+  subagentsByParent?: Record<string, { entries: readonly { kind: string; id: string }[] }>
+}
+
 export interface BlackboardSidebarPanelFace {
-  readBoard(sessionId: string, signal: AbortSignal): Promise<BoardSnapshot>
+  readBoard(sessionId: string, ownerId: string, signal: AbortSignal): Promise<BoardSnapshot>
 }
 
 export interface BlackboardSidebarPanelProps {
   wide: boolean
-  useSessions: (selector: (state: { current?: string }) => string | undefined) => string | undefined
+  useSessions: <T>(selector: (state: SessionListSlice) => T) => T
   t: (key: string, params?: Record<string, unknown>) => string
-  readBoard: (sessionId: string, signal: AbortSignal) => Promise<BoardSnapshot>
+  readBoard: (sessionId: string, ownerId: string, signal: AbortSignal) => Promise<BoardSnapshot>
 }
 
 /**
@@ -34,6 +41,20 @@ export function BlackboardSidebarPanel({
   wide, useSessions, t, readBoard,
 }: BlackboardSidebarPanelProps) {
   const current = useSessions((state) => state.current)
+  const byId = useSessions((state) => state.byId) ?? {}
+  const catalogs = useSessions((state) => state.subagentsByParent)
+  const ownerId = useMemo(() => {
+    try {
+      return boardOwnerFromList({
+        current,
+        byId,
+        ...catalogs !== undefined ? { subagentsByParent: catalogs } : {},
+      })
+    } catch {
+      return current
+    }
+  }, [byId, catalogs, current])
+  const ownerTitle = ownerId === undefined ? undefined : byId[ownerId]?.displayTitle
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<{ left: number; bottom: number }>()
   const [snapshot, setSnapshot] = useState<BoardSnapshot>()
@@ -43,24 +64,29 @@ export function BlackboardSidebarPanel({
   readRef.current = readBoard
 
   useEffect(() => {
-    if (current === undefined) {
+    setSelectedId(undefined)
+    if (!open || current === undefined || ownerId === undefined) {
       setSnapshot(undefined)
       return
     }
+    setSnapshot(undefined)
     const controller = new AbortController()
     const pull = (): void => {
-      void readRef.current(current, controller.signal).then((next) => {
+      void readRef.current(current, ownerId, controller.signal).then((next) => {
         if (!controller.signal.aborted) setSnapshot(next)
+      }).catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        const message = error instanceof Error ? error.message : String(error)
+        setSnapshot({ kind: 'error', message })
       })
     }
     pull()
-    if (!open) return () => { controller.abort() }
     const timer = window.setInterval(pull, POLL_MS)
     return () => {
       controller.abort()
       window.clearInterval(timer)
     }
-  }, [current, open])
+  }, [current, ownerId, open])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -88,6 +114,7 @@ export function BlackboardSidebarPanel({
           className="dsh-bb-panel"
           style={anchor}
           data-blackboard-panel
+          data-blackboard-owner={ownerId}
           aria-label={t('panel.title')}
         >
           <header className="dsh-bb-header">
@@ -95,6 +122,9 @@ export function BlackboardSidebarPanel({
               <span className="dsh-bb-title">{view?.title ?? t('panel.title')}</span>
               {view !== undefined && <span className="dsh-bb-status">{statusLabel}</span>}
             </div>
+            {ownerTitle !== undefined && (
+              <div className="dsh-bb-owner">{t('panel.owner', { title: ownerTitle })}</div>
+            )}
             {view !== undefined && (
               <div className="dsh-bb-meta">
                 <span>{t('meta.facts', { count: view.factCount })}</span>
@@ -150,7 +180,7 @@ function panelBody({
   detail: { kicker: string; body: string } | undefined
 }) {
   if (current === undefined) return <p className="dsh-bb-note">{t('panel.noSession')}</p>
-  if (snapshot === undefined) return <p className="dsh-bb-note">{t('panel.trigger')}</p>
+  if (snapshot === undefined) return <p className="dsh-bb-note">{t('panel.loading')}</p>
   if (snapshot.kind === 'missing') return <p className="dsh-bb-note">{t('panel.empty')}</p>
   if (snapshot.kind === 'invalid') {
     return <p className="dsh-bb-error" role="alert">{t('panel.invalid', { message: snapshot.message })}</p>

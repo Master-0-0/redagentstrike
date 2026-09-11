@@ -1,4 +1,4 @@
-/** Browser half: sidebar-foot blackboard graph over `.dsh/blackboard.json`. */
+/** Browser half: sidebar-foot blackboard graph over `.dsh/blackboards/<main-session-id>.json`. */
 
 import { BlackboardSidebarPanel } from './BlackboardSidebarPanel.tsx'
 import { NS, en, zh } from './locales.ts'
@@ -15,7 +15,13 @@ interface SlotsRuntime {
     id: string
     order: number
     locale: string
-    inject: () => { readBoard: (sessionId: string, signal: AbortSignal) => ReturnType<typeof loadBoardSnapshot> }
+    inject: () => {
+      readBoard: (
+        sessionId: string,
+        ownerId: string,
+        signal: AbortSignal,
+      ) => ReturnType<typeof loadBoardSnapshot>
+    }
   }, component: unknown): () => void
 }
 
@@ -47,7 +53,9 @@ export function apply(ctx: BrowserContext): void {
       order: -10,
       locale: NS,
       inject: () => ({
-        readBoard: (sessionId: string, signal: AbortSignal) => loadBoardSnapshot(remote, sessionId, signal),
+        readBoard: (sessionId: string, ownerId: string, signal: AbortSignal) => (
+          loadBoardSnapshot(remote, sessionId, ownerId, signal)
+        ),
       }),
     }, BlackboardSidebarPanel),
   )

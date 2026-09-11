@@ -1,15 +1,15 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Board, Checkpoint, Fact, Hint, Intent, NextTask, ReasonLease } from './types.ts'
 import {
-  BOARD_RELATIVE_PATH,
   BOOTSTRAP_DESCRIPTION,
   GOAL_ID,
   MAX_INTENTS,
   ORIGIN_ID,
 } from './types.ts'
 import { nextNumericId } from './ids.ts'
+import { boardRelativePath, LEGACY_BOARD_RELATIVE_PATH } from './owner.ts'
 
 const BOOTSTRAP_CREATOR = 'dispatcher.bootstrap'
 const HINT_INIT_CREATOR = 'init'
@@ -144,8 +144,24 @@ function idle(reason: string): NextTask {
   return { kind: 'idle', reason }
 }
 
-export function boardPath(cwd: string): string {
-  return join(cwd, BOARD_RELATIVE_PATH)
+export function boardPath(cwd: string, ownerId: string): string {
+  return join(cwd, boardRelativePath(ownerId))
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function writeAtomic(dest: string, body: string): Promise<void> {
+  await mkdir(dirname(dest), { recursive: true })
+  const tmp = join(dirname(dest), `.blackboard.${randomUUID()}.tmp`)
+  await writeFile(tmp, body, 'utf8')
+  await rename(tmp, dest)
 }
 
 export function emptyBoard(title: string, origin: string, goal: string, hints?: string[]): Board {
@@ -175,9 +191,9 @@ export function emptyBoard(title: string, origin: string, goal: string, hints?: 
   }
 }
 
-export async function loadBoard(cwd: string): Promise<Board | null> {
+export async function loadBoard(cwd: string, ownerId: string): Promise<Board | null> {
   try {
-    const raw = await readFile(boardPath(cwd), 'utf8')
+    const raw = await readFile(boardPath(cwd, ownerId), 'utf8')
     return JSON.parse(raw) as Board
   } catch (err) {
     const error = err as NodeJS.ErrnoException
@@ -186,12 +202,55 @@ export async function loadBoard(cwd: string): Promise<Board | null> {
   }
 }
 
-export async function saveBoard(cwd: string, board: Board): Promise<void> {
-  const dest = boardPath(cwd)
-  await mkdir(dirname(dest), { recursive: true })
-  const tmp = join(dirname(dest), `.blackboard.${randomUUID()}.tmp`)
-  await writeFile(tmp, JSON.stringify(board, null, 2), 'utf8')
-  await rename(tmp, dest)
+export async function saveBoard(cwd: string, ownerId: string, board: Board): Promise<void> {
+  await writeAtomic(boardPath(cwd, ownerId), JSON.stringify(board, null, 2))
+}
+
+/**
+ * Copy one owner's board onto another when the destination file is missing.
+ * @returns true when a file was written.
+ */
+export async function copyBoardIfAbsent(
+  cwd: string,
+  fromOwnerId: string,
+  toOwnerId: string,
+): Promise<boolean> {
+  if (fromOwnerId === toOwnerId) return false
+  const dest = boardPath(cwd, toOwnerId)
+  if (await pathExists(dest)) return false
+  const src = boardPath(cwd, fromOwnerId)
+  if (!(await pathExists(src))) return false
+  await writeAtomic(dest, await readFile(src, 'utf8'))
+  return true
+}
+
+/**
+ * Promote the workspace-scoped legacy file into a per-session board when needed.
+ * @returns true when a file was written.
+ */
+export async function adoptLegacyIfAbsent(cwd: string, ownerId: string): Promise<boolean> {
+  const dest = boardPath(cwd, ownerId)
+  if (await pathExists(dest)) return false
+  const legacy = join(cwd, LEGACY_BOARD_RELATIVE_PATH)
+  if (!(await pathExists(legacy))) return false
+  await writeAtomic(dest, await readFile(legacy, 'utf8'))
+  return true
+}
+
+/**
+ * Ensure `ownerId` has a board file: fork snapshot, then legacy workspace file.
+ */
+export async function seedBoard(
+  cwd: string,
+  ownerId: string,
+  sourceOwnerId?: string,
+): Promise<void> {
+  if (await pathExists(boardPath(cwd, ownerId))) return
+  if (sourceOwnerId !== undefined) {
+    const copied = await copyBoardIfAbsent(cwd, sourceOwnerId, ownerId)
+    if (copied) return
+  }
+  await adoptLegacyIfAbsent(cwd, ownerId)
 }
 
 export function nextTask(board: Board): NextTask {

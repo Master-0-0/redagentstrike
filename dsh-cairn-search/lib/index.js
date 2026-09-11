@@ -2,12 +2,11 @@
 import { defineTool } from "@deepseek-ai/dsh-tools";
 
 // src/board.ts
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 // src/types.ts
-var BOARD_RELATIVE_PATH = ".dsh/blackboard.json";
 var ORIGIN_ID = "origin";
 var GOAL_ID = "goal";
 var BOOTSTRAP_DESCRIPTION = "bootstrap";
@@ -24,6 +23,45 @@ function nextNumericId(prefix, ids) {
     if (n > max) max = n;
   }
   return `${prefix}${String(max + 1).padStart(3, "0")}`;
+}
+
+// src/owner.ts
+var BOARD_DIR_RELATIVE = ".dsh/blackboards";
+var LEGACY_BOARD_RELATIVE_PATH = ".dsh/blackboard.json";
+function encodeBoardOwnerId(id) {
+  const trimmed = id.trim();
+  if (trimmed === "") throw new Error("empty board owner");
+  if (trimmed === "." || trimmed === "..") throw new Error("invalid board owner");
+  let out = "";
+  for (const ch of trimmed) {
+    if (/^[A-Za-z0-9._-]$/.test(ch)) out += ch;
+    else out += `~${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+  }
+  return out;
+}
+function boardRelativePath(ownerId) {
+  return `${BOARD_DIR_RELATIVE}/${encodeBoardOwnerId(ownerId)}.json`;
+}
+function boardOwnerId(from, lookup) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = from;
+  while (current.origin === "subagent" && current.parentId !== void 0 && !seen.has(current.id)) {
+    seen.add(current.id);
+    const parentId = current.parentId;
+    const parent = lookup(parentId);
+    if (parent === void 0) return parentId;
+    current = parent;
+  }
+  return current.id;
+}
+function isConversationFork(session) {
+  return session.origin !== "subagent" && session.parentId !== void 0 && session.isSeeded === true;
+}
+function forkSourceOwnerId(session, lookup) {
+  if (!isConversationFork(session) || session.parentId === void 0) return void 0;
+  const parent = lookup(session.parentId);
+  if (parent === void 0) return session.parentId;
+  return boardOwnerId(parent, lookup);
 }
 
 // src/board.ts
@@ -133,8 +171,22 @@ function assertFrom(board, from) {
 function idle(reason) {
   return { kind: "idle", reason };
 }
-function boardPath(cwd) {
-  return join(cwd, BOARD_RELATIVE_PATH);
+function boardPath(cwd, ownerId) {
+  return join(cwd, boardRelativePath(ownerId));
+}
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function writeAtomic(dest, body) {
+  await mkdir(dirname(dest), { recursive: true });
+  const tmp = join(dirname(dest), `.blackboard.${randomUUID()}.tmp`);
+  await writeFile(tmp, body, "utf8");
+  await rename(tmp, dest);
 }
 function emptyBoard(title, origin, goal, hints) {
   const createdAt = nowIso();
@@ -162,9 +214,9 @@ function emptyBoard(title, origin, goal, hints) {
     }
   };
 }
-async function loadBoard(cwd) {
+async function loadBoard(cwd, ownerId) {
   try {
-    const raw = await readFile(boardPath(cwd), "utf8");
+    const raw = await readFile(boardPath(cwd, ownerId), "utf8");
     return JSON.parse(raw);
   } catch (err) {
     const error = err;
@@ -172,12 +224,33 @@ async function loadBoard(cwd) {
     throw err;
   }
 }
-async function saveBoard(cwd, board) {
-  const dest = boardPath(cwd);
-  await mkdir(dirname(dest), { recursive: true });
-  const tmp = join(dirname(dest), `.blackboard.${randomUUID()}.tmp`);
-  await writeFile(tmp, JSON.stringify(board, null, 2), "utf8");
-  await rename(tmp, dest);
+async function saveBoard(cwd, ownerId, board) {
+  await writeAtomic(boardPath(cwd, ownerId), JSON.stringify(board, null, 2));
+}
+async function copyBoardIfAbsent(cwd, fromOwnerId, toOwnerId) {
+  if (fromOwnerId === toOwnerId) return false;
+  const dest = boardPath(cwd, toOwnerId);
+  if (await pathExists(dest)) return false;
+  const src = boardPath(cwd, fromOwnerId);
+  if (!await pathExists(src)) return false;
+  await writeAtomic(dest, await readFile(src, "utf8"));
+  return true;
+}
+async function adoptLegacyIfAbsent(cwd, ownerId) {
+  const dest = boardPath(cwd, ownerId);
+  if (await pathExists(dest)) return false;
+  const legacy = join(cwd, LEGACY_BOARD_RELATIVE_PATH);
+  if (!await pathExists(legacy)) return false;
+  await writeAtomic(dest, await readFile(legacy, "utf8"));
+  return true;
+}
+async function seedBoard(cwd, ownerId, sourceOwnerId) {
+  if (await pathExists(boardPath(cwd, ownerId))) return;
+  if (sourceOwnerId !== void 0) {
+    const copied = await copyBoardIfAbsent(cwd, sourceOwnerId, ownerId);
+    if (copied) return;
+  }
+  await adoptLegacyIfAbsent(cwd, ownerId);
 }
 function nextTask(board) {
   if (board.status !== "active") return idle(board.status);
@@ -385,7 +458,7 @@ var OPS = [
   "stop",
   "reopen"
 ];
-var DESCRIPTION = "Read and update the origin\u2192goal fact-intent blackboard at .dsh/blackboard.json. This tool is the only writer of that file. Call op=init once per workspace (title, origin, goal, optional hints), then op=next to learn the next task (bootstrap, reason, explore, or idle). Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. Do not hand-edit the board file. Policy refusals are not facts.";
+var DESCRIPTION = "Read and update the origin\u2192goal fact-intent blackboard at .dsh/blackboards/<main-session-id>.json. This tool is the only writer of that file. Subagent sessions share the main session's board; a forked conversation gets its own copy of the source snapshot. Call op=init once per main session (title, origin, goal, optional hints), then op=next to learn the next task (bootstrap, reason, explore, or idle). Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. Do not hand-edit the board file. Policy refusals are not facts.";
 var INTENT_DRAFT = {
   type: "object",
   additionalProperties: false,
@@ -472,7 +545,8 @@ function apply(ctx) {
       render: (_args, value) => [{ type: "text", text: JSON.stringify(value, null, 2) }]
     },
     async execute(args, exec) {
-      const cwd = workspaceCwd(exec);
+      const target = boardTarget(ctx, exec);
+      const { cwd, ownerId } = target;
       switch (args.op) {
         case "init": {
           const board = ensureBootstrapIntent(emptyBoard(
@@ -481,70 +555,70 @@ function apply(ctx) {
             required(args.goal, "goal"),
             args.hints
           ));
-          await saveBoard(cwd, board);
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, next: nextTask(board) };
         }
         case "snapshot": {
-          const board = await requireBoard(cwd);
+          const board = await requireBoard(target);
           return { ok: true, op: args.op, board };
         }
         case "next": {
-          const board = await requireBoard(cwd);
+          const board = await requireBoard(target);
           return { ok: true, op: args.op, next: nextTask(board) };
         }
         case "claim": {
           const intentId = required(args.intentId, "intentId");
-          const board = claimIntent(await requireBoard(cwd), intentId, required(args.worker, "worker"));
-          await saveBoard(cwd, board);
+          const board = claimIntent(await requireBoard(target), intentId, required(args.worker, "worker"));
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, intent: intentOf(board, intentId) };
         }
         case "conclude": {
           const intentId = required(args.intentId, "intentId");
           const { board, fact } = concludeIntent(
-            await requireBoard(cwd),
+            await requireBoard(target),
             intentId,
             required(args.description, "description"),
             required(args.worker, "worker")
           );
-          await saveBoard(cwd, board);
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, fact, intent: intentOf(board, intentId) };
         }
         case "reason_start": {
-          const { board, trigger } = startReason(await requireBoard(cwd), required(args.worker, "worker"));
-          await saveBoard(cwd, board);
+          const { board, trigger } = startReason(await requireBoard(target), required(args.worker, "worker"));
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, trigger };
         }
         case "reason_finish": {
-          const board = finishReason(await requireBoard(cwd), required(args.worker, "worker"), {
+          const board = finishReason(await requireBoard(target), required(args.worker, "worker"), {
             ...args.complete !== void 0 ? { complete: args.complete } : {},
             ...args.intents !== void 0 ? { intents: args.intents } : {}
           });
-          await saveBoard(cwd, board);
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, next: nextTask(board) };
         }
         case "hint": {
           const { board, hint } = addHint(
-            await requireBoard(cwd),
+            await requireBoard(target),
             required(args.content, "content"),
             args.creator?.trim() || "user"
           );
-          await saveBoard(cwd, board);
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, hint };
         }
         case "release": {
           const intentId = required(args.intentId, "intentId");
-          const board = releaseIntent(await requireBoard(cwd), intentId);
-          await saveBoard(cwd, board);
+          const board = releaseIntent(await requireBoard(target), intentId);
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board, intent: intentOf(board, intentId) };
         }
         case "stop": {
-          const board = stopBoard(await requireBoard(cwd));
-          await saveBoard(cwd, board);
+          const board = stopBoard(await requireBoard(target));
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board };
         }
         case "reopen": {
-          const board = reopenBoard(await requireBoard(cwd));
-          await saveBoard(cwd, board);
+          const board = reopenBoard(await requireBoard(target));
+          await saveBoard(cwd, ownerId, board);
           return { ok: true, op: args.op, board };
         }
         default: {
@@ -560,15 +634,47 @@ function isHostUiInsert(ctx) {
   const fiber = ctx.fiber;
   return fiber.entry?.options?.id === HOST_UI_ENTRY_ID;
 }
-function workspaceCwd(exec) {
-  const cwd = exec.agent?.session.header.cwd;
-  if (cwd === void 0 || cwd.trim() === "") {
+function sessionsOf(ctx) {
+  const get = ctx.get;
+  if (typeof get !== "function") return void 0;
+  try {
+    return get.call(ctx, "sessions", false);
+  } catch {
+    return void 0;
+  }
+}
+function lineageOf(session) {
+  const header = session.header;
+  return {
+    id: session.id,
+    ...header?.parentSession !== void 0 ? { parentId: header.parentSession } : {},
+    ...header?.origin !== void 0 ? { origin: header.origin } : {},
+    ...header?.isSeeded !== void 0 ? { isSeeded: header.isSeeded } : {}
+  };
+}
+function lookupOf(sessions) {
+  return (id) => {
+    const found = sessions?.get(id);
+    return found === void 0 ? void 0 : lineageOf(found);
+  };
+}
+function boardTarget(ctx, exec) {
+  const session = exec.agent?.session;
+  const cwd = session?.header?.cwd;
+  if (session === void 0 || cwd === void 0 || cwd.trim() === "") {
     throw new Error("blackboard requires a session workspace");
   }
-  return cwd;
+  const lookup = lookupOf(sessionsOf(ctx));
+  const lineage = lineageOf(session);
+  return {
+    cwd,
+    ownerId: boardOwnerId(lineage, lookup),
+    ...isConversationFork(lineage) ? { sourceOwnerId: forkSourceOwnerId(lineage, lookup) } : {}
+  };
 }
-async function requireBoard(cwd) {
-  const board = await loadBoard(cwd);
+async function requireBoard(target) {
+  await seedBoard(target.cwd, target.ownerId, target.sourceOwnerId);
+  const board = await loadBoard(target.cwd, target.ownerId);
   if (board === null) throw new Error("no blackboard; call op=init");
   return board;
 }

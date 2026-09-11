@@ -54,7 +54,6 @@ export type NextTask =
   | { kind: 'explore'; intent: Intent }
   | { kind: 'idle'; reason: string }
 
-export const BOARD_RELATIVE_PATH = '.dsh/blackboard.json'
 export const ORIGIN_ID = 'origin'
 export const GOAL_ID = 'goal'
 export const BOOTSTRAP_DESCRIPTION = 'bootstrap'

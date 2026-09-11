@@ -118,6 +118,11 @@ const CSS = `
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
 }
+.dsh-bb-owner {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
 .dsh-bb-meta {
   display: flex;
   flex-wrap: wrap;

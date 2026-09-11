@@ -5,9 +5,11 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   addHint,
+  adoptLegacyIfAbsent,
   boardPath,
   claimIntent,
   concludeIntent,
+  copyBoardIfAbsent,
   emptyBoard,
   ensureBootstrapIntent,
   finishReason,
@@ -16,10 +18,12 @@ import {
   releaseIntent,
   reopenBoard,
   saveBoard,
+  seedBoard,
   startReason,
   stopBoard,
 } from '../src/board.ts'
-import { BOARD_RELATIVE_PATH, GOAL_ID, MAX_INTENTS, ORIGIN_ID } from '../src/types.ts'
+import { boardRelativePath, LEGACY_BOARD_RELATIVE_PATH } from '../src/owner.ts'
+import { GOAL_ID, MAX_INTENTS, ORIGIN_ID } from '../src/types.ts'
 import type { Board, Intent } from '../src/types.ts'
 
 const ORIGIN = 'repo tests failing'
@@ -75,16 +79,60 @@ test('init: origin, goal, checkpoint, bootstrap next', () => {
 
 test('loadBoard returns null when missing; saveBoard writes 2-space JSON atomically', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cairn-board-'))
+  const owner = 'main-a'
   try {
-    assert.equal(await loadBoard(dir), null)
+    assert.equal(await loadBoard(dir, owner), null)
     const board = fresh()
-    await saveBoard(dir, board)
-    assert.equal(boardPath(dir), join(dir, BOARD_RELATIVE_PATH))
-    const raw = await readFile(boardPath(dir), 'utf8')
+    await saveBoard(dir, owner, board)
+    assert.equal(boardPath(dir, owner), join(dir, boardRelativePath(owner)))
+    const raw = await readFile(boardPath(dir, owner), 'utf8')
     assert.match(raw, /^\{\n  "/)
-    const loaded = await loadBoard(dir)
+    const loaded = await loadBoard(dir, owner)
     assert.equal(loaded?.title, board.title)
     assert.equal(loaded?.facts.length, 2)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('parallel main sessions keep separate board files', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cairn-board-'))
+  try {
+    await saveBoard(dir, 'sess-a', fresh())
+    await saveBoard(dir, 'sess-b', emptyBoard('other', 'start', 'end'))
+    assert.equal((await loadBoard(dir, 'sess-a'))?.title, 'repo tests')
+    assert.equal((await loadBoard(dir, 'sess-b'))?.title, 'other')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('copyBoardIfAbsent snapshots a fork without clobbering an existing dest', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cairn-board-'))
+  try {
+    const source = ensureBootstrapIntent(fresh())
+    await saveBoard(dir, 'main-a', source)
+    assert.equal(await copyBoardIfAbsent(dir, 'main-a', 'fork-b'), true)
+    assert.equal((await loadBoard(dir, 'fork-b'))?.title, source.title)
+    await saveBoard(dir, 'fork-b', emptyBoard('forked', 'o', 'g'))
+    assert.equal(await copyBoardIfAbsent(dir, 'main-a', 'fork-b'), false)
+    assert.equal((await loadBoard(dir, 'fork-b'))?.title, 'forked')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('seedBoard adopts legacy .dsh/blackboard.json once per owner', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cairn-board-'))
+  try {
+    const legacy = join(dir, LEGACY_BOARD_RELATIVE_PATH)
+    await saveBoard(dir, 'tmp', fresh())
+    const { mkdir, rename } = await import('node:fs/promises')
+    await mkdir(join(dir, '.dsh'), { recursive: true })
+    await rename(boardPath(dir, 'tmp'), legacy)
+    await seedBoard(dir, 'main-a')
+    assert.equal((await loadBoard(dir, 'main-a'))?.title, 'repo tests')
+    assert.equal(await adoptLegacyIfAbsent(dir, 'main-a'), false)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

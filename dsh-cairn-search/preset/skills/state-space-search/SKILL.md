@@ -15,7 +15,7 @@ Operate only where the user has authority (this workspace, systems they own, or 
 
 ## Sole writer
 
-**Only this parent session calls the `blackboard` tool.** The engine owns `.dsh/blackboard.json`. Do not create, edit, or rewrite that file with filesystem tools. Explorers never call `blackboard`; they return one JSON object to the parent, and the parent writes it.
+**Only this parent session calls the `blackboard` tool.** The engine owns `.dsh/blackboards/<this main session id>.json`. Subagents share that file; a forked session gets its own copy. Do not create, edit, or rewrite board files with filesystem tools. Explorers never call `blackboard`; they return one JSON object to the parent, and the parent writes it.
 
 Load this skill before the first `blackboard` call.
 
@@ -68,7 +68,7 @@ Give the child:
 
 - the current board snapshot as JSON (from the `claim` / `snapshot` result)
 - `intent_id` and `intent_description`
-- instruction: explore **only** this intent; return one JSON object `{"description": "..."}`; do not propose new intents; do not call `blackboard`; do not edit `.dsh/blackboard.json`; put bulky evidence in a file and reference it; a thorough negative result is a valid fact
+- instruction: explore **only** this intent; return one JSON object `{"description": "..."}`; do not propose new intents; do not call `blackboard`; do not edit `.dsh/blackboards/`; put bulky evidence in a file and reference it; a thorough negative result is a valid fact
 - authorization: same as this skill
 
 After the child returns, parent: `blackboard op=conclude` with that `description`. Then `op=next`.

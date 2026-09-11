@@ -31,8 +31,65 @@ module.exports = __toCommonJS(index_exports);
 var import_react = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
+// src/owner.ts
+var BOARD_DIR_RELATIVE = ".dsh/blackboards";
+function encodeBoardOwnerId(id) {
+  const trimmed = id.trim();
+  if (trimmed === "") throw new Error("empty board owner");
+  if (trimmed === "." || trimmed === "..") throw new Error("invalid board owner");
+  let out = "";
+  for (const ch of trimmed) {
+    if (/^[A-Za-z0-9._-]$/.test(ch)) out += ch;
+    else out += `~${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+  }
+  return out;
+}
+function boardRelativePath(ownerId) {
+  return `${BOARD_DIR_RELATIVE}/${encodeBoardOwnerId(ownerId)}.json`;
+}
+function boardOwnerId(from, lookup) {
+  const seen = /* @__PURE__ */ new Set();
+  let current = from;
+  while (current.origin === "subagent" && current.parentId !== void 0 && !seen.has(current.id)) {
+    seen.add(current.id);
+    const parentId = current.parentId;
+    const parent = lookup(parentId);
+    if (parent === void 0) return parentId;
+    current = parent;
+  }
+  return current.id;
+}
+function boardOwnerFromList(list) {
+  if (list.current === void 0) return void 0;
+  const lookup = (id) => {
+    const row = list.byId[id];
+    const catalogParent = parentFromCatalog(id, list.subagentsByParent);
+    if (row === void 0 && catalogParent === void 0) return void 0;
+    return lineageFromList(id, list);
+  };
+  return boardOwnerId(lineageFromList(list.current, list), lookup);
+}
+function parentFromCatalog(childId, catalogs) {
+  if (catalogs === void 0) return void 0;
+  for (const [parentId, snapshot] of Object.entries(catalogs)) {
+    if (snapshot.entries.some((entry) => entry.kind === "child" && entry.id === childId)) {
+      return parentId;
+    }
+  }
+  return void 0;
+}
+function lineageFromList(id, list) {
+  const row = list.byId[id];
+  const catalogParent = parentFromCatalog(id, list.subagentsByParent);
+  return {
+    id,
+    ...row?.parentId !== void 0 ? { parentId: row.parentId } : catalogParent !== void 0 ? { parentId: catalogParent } : {},
+    ...row?.origin !== void 0 ? { origin: row.origin } : catalogParent !== void 0 ? { origin: "subagent" } : {},
+    ...row?.isSeeded !== void 0 ? { isSeeded: row.isSeeded } : {}
+  };
+}
+
 // src/types.ts
-var BOARD_RELATIVE_PATH = ".dsh/blackboard.json";
 var ORIGIN_ID = "origin";
 var GOAL_ID = "goal";
 
@@ -416,6 +473,20 @@ function BlackboardSidebarPanel({
   readBoard
 }) {
   const current = useSessions((state) => state.current);
+  const byId = useSessions((state) => state.byId) ?? {};
+  const catalogs = useSessions((state) => state.subagentsByParent);
+  const ownerId = (0, import_react.useMemo)(() => {
+    try {
+      return boardOwnerFromList({
+        current,
+        byId,
+        ...catalogs !== void 0 ? { subagentsByParent: catalogs } : {}
+      });
+    } catch {
+      return current;
+    }
+  }, [byId, catalogs, current]);
+  const ownerTitle = ownerId === void 0 ? void 0 : byId[ownerId]?.displayTitle;
   const [open, setOpen] = (0, import_react.useState)(false);
   const [anchor, setAnchor] = (0, import_react.useState)();
   const [snapshot, setSnapshot] = (0, import_react.useState)();
@@ -424,26 +495,29 @@ function BlackboardSidebarPanel({
   const readRef = (0, import_react.useRef)(readBoard);
   readRef.current = readBoard;
   (0, import_react.useEffect)(() => {
-    if (current === void 0) {
+    setSelectedId(void 0);
+    if (!open || current === void 0 || ownerId === void 0) {
       setSnapshot(void 0);
       return;
     }
+    setSnapshot(void 0);
     const controller = new AbortController();
     const pull = () => {
-      void readRef.current(current, controller.signal).then((next) => {
+      void readRef.current(current, ownerId, controller.signal).then((next) => {
         if (!controller.signal.aborted) setSnapshot(next);
+      }).catch((error) => {
+        if (controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setSnapshot({ kind: "error", message });
       });
     };
     pull();
-    if (!open) return () => {
-      controller.abort();
-    };
     const timer = window.setInterval(pull, POLL_MS);
     return () => {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [current, open]);
+  }, [current, ownerId, open]);
   (0, import_react.useLayoutEffect)(() => {
     if (!open) return;
     const place = () => {
@@ -469,6 +543,7 @@ function BlackboardSidebarPanel({
         className: "dsh-bb-panel",
         style: anchor,
         "data-blackboard-panel": true,
+        "data-blackboard-owner": ownerId,
         "aria-label": t("panel.title"),
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("header", { className: "dsh-bb-header", children: [
@@ -476,6 +551,7 @@ function BlackboardSidebarPanel({
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-title", children: view?.title ?? t("panel.title") }),
               view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-status", children: statusLabel })
             ] }),
+            ownerTitle !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-bb-owner", children: t("panel.owner", { title: ownerTitle }) }),
             view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-meta", children: [
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("meta.facts", { count: view.factCount }) }),
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("meta.open", { count: view.openCount }) }),
@@ -520,7 +596,7 @@ function panelBody({
   detail
 }) {
   if (current === void 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.noSession") });
-  if (snapshot === void 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.trigger") });
+  if (snapshot === void 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.loading") });
   if (snapshot.kind === "missing") return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.empty") });
   if (snapshot.kind === "invalid") {
     return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-error", role: "alert", children: t("panel.invalid", { message: snapshot.message }) });
@@ -572,7 +648,9 @@ var zh = {
   "panel.trigger": "\u753B\u677F",
   "panel.title": "\u753B\u677F",
   "panel.aria": "\u753B\u677F\uFF0C{status}",
-  "panel.empty": "\u5F53\u524D\u5DE5\u4F5C\u533A\u8FD8\u6CA1\u6709\u753B\u677F\u3002Agent \u8C03\u7528 blackboard op=init \u540E\u4F1A\u5199\u5165 .dsh/blackboard.json\u3002",
+  "panel.empty": "\u5F53\u524D\u4F1A\u8BDD\u8FD8\u6CA1\u6709\u753B\u677F\u3002Agent \u8C03\u7528 blackboard op=init \u540E\u4F1A\u5199\u5165\u8BE5\u4E3B\u4F1A\u8BDD\u7684\u753B\u677F\u6587\u4EF6\u3002\u5B50\u4EE3\u7406\u5171\u7528\u4E3B\u4F1A\u8BDD\u7684\u753B\u677F\u3002",
+  "panel.loading": "\u6B63\u5728\u52A0\u8F7D\u753B\u677F\u2026",
+  "panel.owner": "\u4F1A\u8BDD {title}",
   "panel.noSession": "\u6253\u5F00\u4E00\u4E2A\u5E26\u5DE5\u4F5C\u533A\u7684\u4F1A\u8BDD\u540E\u5373\u53EF\u67E5\u770B\u753B\u677F\u3002",
   "panel.invalid": "\u65E0\u6CD5\u89E3\u6790\u753B\u677F\uFF1A{message}",
   "panel.load.error": "\u8BFB\u53D6\u753B\u677F\u5931\u8D25\uFF1A{message}",
@@ -600,7 +678,9 @@ var en = {
   "panel.trigger": "Blackboard",
   "panel.title": "Blackboard",
   "panel.aria": "Blackboard, {status}",
-  "panel.empty": "This workspace has no blackboard yet. The agent writes .dsh/blackboard.json after blackboard op=init.",
+  "panel.empty": "This session has no blackboard yet. The agent writes the main session file after blackboard op=init. Subagents share that board.",
+  "panel.loading": "Loading blackboard\u2026",
+  "panel.owner": "Session {title}",
   "panel.noSession": "Open a session with a workspace to view the blackboard.",
   "panel.invalid": "Could not parse the blackboard: {message}",
   "panel.load.error": "Failed to read the blackboard: {message}",
@@ -626,24 +706,31 @@ var en = {
 };
 
 // src/client/rpc.ts
-async function loadBoardSnapshot(remote, sessionId, signal) {
+async function loadBoardSnapshot(remote, sessionId, ownerId, signal) {
+  let path;
+  try {
+    path = boardRelativePath(ownerId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { kind: "error", message };
+  }
   const chunks = [];
   let offset = 1;
   for (; ; ) {
     const result = await remote.workspaceFiles.read(
       sessionId,
-      BOARD_RELATIVE_PATH,
+      path,
       { offset },
       signal
     );
     if (!result.ok) {
-      if (result.error.code === "workspace-file/not-found") return { kind: "missing" };
-      return { kind: "error", message: result.error.message };
+      if (result.error?.code === "workspace-file/not-found") return { kind: "missing" };
+      return { kind: "error", message: result.error?.message ?? "read failed" };
     }
     if (result.value.lines > 0) chunks.push(result.value.text);
     if (result.value.eof) break;
     offset += result.value.lines;
-    if (offset > 1e6) return { kind: "error", message: "blackboard.json is too large to display" };
+    if (offset > 1e6) return { kind: "error", message: "blackboard is too large to display" };
   }
   return readBoardText(chunks.join("\n"));
 }
@@ -762,6 +849,11 @@ var CSS = `
 }
 .dsh-bb-status {
   flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+.dsh-bb-owner {
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
@@ -935,7 +1027,7 @@ function apply(ctx) {
       order: -10,
       locale: NS,
       inject: () => ({
-        readBoard: (sessionId, signal) => loadBoardSnapshot(remote, sessionId, signal)
+        readBoard: (sessionId, ownerId, signal) => loadBoardSnapshot(remote, sessionId, ownerId, signal)
       })
     }, BlackboardSidebarPanel)
   );

@@ -5,18 +5,33 @@ Out-of-tree DeepSeek Harness plugin. Implements a **fact-intent blackboard** for
 ## Layout
 
 - `src/types.ts` — frozen vocabulary. Do not rename fields without updating every caller.
+- `src/owner.ts` — main-session board ownership (subagents share, forks copy). No cordis.
 - `src/board.ts` — load/save + mutations + `nextTask`. No cordis.
-- `src/view.ts` — parse `.dsh/blackboard.json` and place the origin→goal graph. Read-only.
+- `src/view.ts` — parse a board snapshot and place the origin→goal graph. Read-only.
 - `src/index.ts` — Cordis function plugin: `name` / `inject` / `apply`. Registers one tool `blackboard`. Host-plane insert `cairn-search-ui` skips the tool so it stays preset-scoped.
-- `src/client/` — Web sidebar-foot blackboard entry (`order: -10`, above 子代理). Reads the board through `workspaceFiles.read` and redraws on a short poll.
+- `src/client/` — Web sidebar-foot blackboard entry (`order: -10`, above 子代理). Follows the selected session's owner board (subagents share, forks are independent) through `workspaceFiles.read`.
 - `cordis.patch.yml` — host insert that serves the `./client` bundle. Install this package as a profile bundle (`dsh plugin add`) so the web roster picks it up.
 - `scripts/link-peers.mjs` — after install, symlink `@deepseek-ai/dsh-tools` and `cordis` to `~/.dsh/profiles/node_modules` so the running host and this plugin share one registry instance.
-- `tests/` — node:test against `board.ts`, `view.ts`, and the client read helper.
+- `tests/` — node:test against `board.ts`, `owner.ts`, `view.ts`, and the client read helper.
 - `preset/` — files copied into `~/.dsh/.agent-presets/cairn/`.
 
 ## Persistence
 
-Workspace file `<cwd>/.dsh/blackboard.json` (`BOARD_RELATIVE_PATH`). JSON, pretty-printed, atomic write (temp + rename). Create `.dsh/` as needed.
+Workspace file `<cwd>/.dsh/blackboards/<main-session-id>.json` (`boardRelativePath`). JSON, pretty-printed, atomic write (temp + rename). Create `.dsh/blackboards/` as needed.
+
+Ownership:
+
+| Scene | Board file |
+| --- | --- |
+| New main session | create `.dsh/blackboards/<that session id>.json` on `op=init` |
+| Restore an existing session | keep reading the same file |
+| Main session spawns subagents | children share the main session file |
+| Sidebar switches session | show that session's owner board |
+| Fork a session | new file; copy the source snapshot when present |
+
+A leftover `<cwd>/.dsh/blackboard.json` is adopted once into a missing per-session file.
+
+Resolve cwd from `exec.agent.session.header.cwd`. Owner id walks `origin === 'subagent'` parent links. Reject if cwd is missing.
 
 ## Invariants (engine must enforce)
 
@@ -54,7 +69,7 @@ Single model-facing tool. `op` discriminator:
 `complete` on reason_finish: `{ from: string[], description: string }`.
 `intents` on reason_finish: `{ from: string[], description: string }[]`.
 
-Resolve cwd from `exec.agent.session.header.cwd`. Reject if missing.
+Resolve cwd from `exec.agent.session.header.cwd`. Owner id is the subagent lineage root (a conversation fork is its own root). Reject if cwd is missing.
 
 ## Authorization
 
