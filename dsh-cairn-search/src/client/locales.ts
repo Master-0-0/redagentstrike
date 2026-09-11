@@ -1,0 +1,63 @@
+/** `blackboard` namespace dictionaries. */
+
+export const NS = 'blackboard'
+
+export const zh = {
+  'panel.trigger': '画板',
+  'panel.title': '画板',
+  'panel.aria': '画板，{status}',
+  'panel.empty': '当前工作区还没有画板。Agent 调用 blackboard op=init 后会写入 .dsh/blackboard.json。',
+  'panel.noSession': '打开一个带工作区的会话后即可查看画板。',
+  'panel.invalid': '无法解析画板：{message}',
+  'panel.load.error': '读取画板失败：{message}',
+  'status.active': '进行中',
+  'status.stopped': '已停止',
+  'status.completed': '已完成',
+  'meta.facts': '{count} 条事实',
+  'meta.open': '{count} 条未完成意图',
+  'meta.reasoning': '正在推理（{worker}）',
+  'legend.origin': '起点',
+  'legend.goal': '目标',
+  'legend.fact': '事实',
+  'legend.open': '探索中',
+  'legend.claimed': '已认领',
+  'detail.intent': '意图 {id}',
+  'detail.fact': '事实 {id}',
+  'detail.from': '来自 {ids}',
+  'detail.worker': '执行者 {worker}',
+  'detail.hint': '提示',
+  'kind.origin': '起点',
+  'kind.goal': '目标',
+  'kind.fact': '事实',
+} as const
+
+export const en: Record<BlackboardKey, string> = {
+  'panel.trigger': 'Blackboard',
+  'panel.title': 'Blackboard',
+  'panel.aria': 'Blackboard, {status}',
+  'panel.empty': 'This workspace has no blackboard yet. The agent writes .dsh/blackboard.json after blackboard op=init.',
+  'panel.noSession': 'Open a session with a workspace to view the blackboard.',
+  'panel.invalid': 'Could not parse the blackboard: {message}',
+  'panel.load.error': 'Failed to read the blackboard: {message}',
+  'status.active': 'active',
+  'status.stopped': 'stopped',
+  'status.completed': 'completed',
+  'meta.facts': '{count} facts',
+  'meta.open': '{count} open intents',
+  'meta.reasoning': 'reasoning ({worker})',
+  'legend.origin': 'Origin',
+  'legend.goal': 'Goal',
+  'legend.fact': 'Fact',
+  'legend.open': 'Exploring',
+  'legend.claimed': 'Claimed',
+  'detail.intent': 'Intent {id}',
+  'detail.fact': 'Fact {id}',
+  'detail.from': 'from {ids}',
+  'detail.worker': 'worker {worker}',
+  'detail.hint': 'Hints',
+  'kind.origin': 'Origin',
+  'kind.goal': 'Goal',
+  'kind.fact': 'Fact',
+}
+
+export type BlackboardKey = keyof typeof zh

@@ -6,9 +6,12 @@ Out-of-tree DeepSeek Harness plugin. Implements a **fact-intent blackboard** for
 
 - `src/types.ts` — frozen vocabulary. Do not rename fields without updating every caller.
 - `src/board.ts` — load/save + mutations + `nextTask`. No cordis.
-- `src/index.ts` — Cordis function plugin: `name` / `inject` / `apply`. Registers one tool `blackboard`.
+- `src/view.ts` — parse `.dsh/blackboard.json` and place the origin→goal graph. Read-only.
+- `src/index.ts` — Cordis function plugin: `name` / `inject` / `apply`. Registers one tool `blackboard`. Host-plane insert `cairn-search-ui` skips the tool so it stays preset-scoped.
+- `src/client/` — Web sidebar-foot blackboard entry (`order: -10`, above 子代理). Reads the board through `workspaceFiles.read` and redraws on a short poll.
+- `cordis.patch.yml` — host insert that serves the `./client` bundle. Install this package as a profile bundle (`dsh plugin add`) so the web roster picks it up.
 - `scripts/link-peers.mjs` — after install, symlink `@deepseek-ai/dsh-tools` and `cordis` to `~/.dsh/profiles/node_modules` so the running host and this plugin share one registry instance.
-- `tests/` — node:test against `board.ts` only.
+- `tests/` — node:test against `board.ts`, `view.ts`, and the client read helper.
 - `preset/` — files copied into `~/.dsh/.agent-presets/cairn/`.
 
 ## Persistence

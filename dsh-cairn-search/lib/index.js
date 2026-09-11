@@ -403,7 +403,9 @@ var INTENT_DRAFT = {
     }
   }
 };
+var HOST_UI_ENTRY_ID = "cairn-search-ui";
 function apply(ctx) {
+  if (isHostUiInsert(ctx)) return;
   ctx.tools.register(defineTool({
     name: "blackboard",
     description: DESCRIPTION,
@@ -553,6 +555,10 @@ function apply(ctx) {
     },
     presentCall: (args) => ({ card: "generic", title: `blackboard ${args.op}`, kind: "search" })
   }));
+}
+function isHostUiInsert(ctx) {
+  const fiber = ctx.fiber;
+  return fiber.entry?.options?.id === HOST_UI_ENTRY_ID;
 }
 function workspaceCwd(exec) {
   const cwd = exec.agent?.session.header.cwd;

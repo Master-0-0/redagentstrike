@@ -69,11 +69,17 @@ const INTENT_DRAFT = {
   },
 } as const
 
+/** Loader entry id for the host-plane insert that serves the browser half. */
+const HOST_UI_ENTRY_ID = 'cairn-search-ui'
+
 /**
  * Register the `blackboard` tool on `ctx.tools`.
+ * The same package is also inserted on the host plane (`cairn-search-ui`) so the
+ * web client bundle is served; that insert must not publish the tool globally.
  * @param ctx - registrant context carrying the tool registry.
  */
 export function apply(ctx: Context): void {
+  if (isHostUiInsert(ctx)) return
   ctx.tools.register(defineTool({
     name: 'blackboard',
     description: DESCRIPTION,
@@ -223,6 +229,11 @@ export function apply(ctx: Context): void {
     },
     presentCall: args => ({ card: 'generic', title: `blackboard ${args.op}`, kind: 'search' }),
   }))
+}
+
+function isHostUiInsert(ctx: Context): boolean {
+  const fiber = ctx.fiber as { entry?: { options?: { id?: string } } }
+  return fiber.entry?.options?.id === HOST_UI_ENTRY_ID
 }
 
 function workspaceCwd(exec: ToolExecution): string {
