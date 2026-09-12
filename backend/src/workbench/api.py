@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import subprocess
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -11,13 +11,16 @@ import httpx
 
 from .config import Settings, load_settings
 from .control import ControlPlane, new_id, utcnow
+from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
 from .intercept import HoldBoard, ReplayCache
 from .harness import HarnessManager
 from .join import align_tool_call
 from .mitm import MitmManager
 from .netstore import HttpEvent, NetStore
+from .proxycheck import check_entry
+from .proxyfetch import ingest_public
+from .proxypool import Lease, LeaseError, PoolEmpty, ProxyEntry, ProxyPool
 from .redact import decode_body, host_from_url, plain_headers, summarize
-from .spawn import proxy_env, which_curl
 
 
 class CreateRunBody(BaseModel):
@@ -46,6 +49,7 @@ class IngestBody(BaseModel):
     resp_body: str = ""
     evidence_id: Optional[str] = None
     already_redacted: bool = False
+    egress_proxy_id: Optional[str] = None
 
 
 class ProbeBody(BaseModel):
@@ -68,6 +72,41 @@ class RequestDraft(BaseModel):
     body: str = ""
 
 
+class ProxyCreate(BaseModel):
+    scheme: str = "http"
+    host: str
+    port: int
+    username: str = ""
+    password: str = ""
+    note: str = ""
+    source: str = "manual"
+
+
+class ProxyPatch(BaseModel):
+    enabled: Optional[bool] = None
+    note: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class LeaseFailBody(BaseModel):
+    reason: str = ""
+
+
+class ProxyCheckBody(BaseModel):
+    url: Optional[str] = None
+
+
+class ProxyFetchBody(BaseModel):
+    limit: int = 8
+    check: bool = True
+
+
+class ProxyAgentBody(BaseModel):
+    op: str = "get"
+    reason: str = "timeout"
+
+
 class AppState:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -78,11 +117,53 @@ class AppState:
         self.holds = HoldBoard()
         self.replays = ReplayCache()
         self.harness = HarnessManager(settings)
+        self.pool = ProxyPool(settings.control_db)
+        self.agent_lease: Optional[Lease] = None
+        _install_agent_skill()
+
+    def pool_view(self) -> Dict[str, Any]:
+        return {**self.pool.snapshot(), "agent": self.agent_as_api()}
+
+    def agent_as_api(self) -> Dict[str, Any]:
+        if self.agent_lease is None:
+            return {"lease_id": None, "proxy_id": None, "url": None}
+        return self.agent_lease.as_api()
+
+    def agent_get(self) -> Lease:
+        if self.agent_lease is not None:
+            return self.agent_lease
+        lease = self.pool.lease()
+        self.agent_lease = lease
+        return lease
+
+    def agent_next(self, reason: str = "timeout") -> Lease:
+        current = self.agent_lease
+        self.agent_lease = None
+        exclude: List[str] = []
+        if current is not None:
+            exclude.append(current.proxy_id)
+            try:
+                self.pool.fail(current.lease_id, reason=reason or "timeout")
+            except LeaseError:
+                pass
+        try:
+            lease = self.pool.lease(exclude_ids=exclude)
+        except PoolEmpty:
+            lease = self.pool.lease()
+        self.agent_lease = lease
+        return lease
+
+    def agent_ok(self) -> Optional[ProxyEntry]:
+        if self.agent_lease is None:
+            return None
+        entry = self.pool.ok(self.agent_lease.lease_id)
+        return entry
 
     def close(self) -> None:
         self.holds.release_all("drop")
         self.mitm.close()
         self.harness.close()
+        self.pool.close()
         self.control.close()
         self.net.close()
 
@@ -333,6 +414,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             resp_body=resp_body,
             evidence_id=body.evidence_id,
             failed=failed,
+            egress_proxy_id=body.egress_proxy_id,
         )
         st.net.insert(event)
         st.replays.put(
@@ -347,6 +429,132 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         )
         return {"accepted": True, "id": event.id}
 
+    @app.get("/internal/net/egress")
+    def active_egress() -> Dict[str, Any]:
+        return state().agent_as_api()
+
+    @app.get("/proxy-pool")
+    def list_proxy_pool() -> Dict[str, Any]:
+        return state().pool_view()
+
+    @app.post("/proxy-pool")
+    def add_proxy(body: ProxyCreate) -> Dict[str, Any]:
+        try:
+            entry = state().pool.add(
+                scheme=body.scheme,
+                host=body.host,
+                port=body.port,
+                username=body.username,
+                password=body.password,
+                note=body.note,
+                source=body.source or "manual",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"entry": entry.as_api(), **state().pool_view()}
+
+    @app.post("/proxy-pool/fetch")
+    def fetch_public_proxies(body: Optional[ProxyFetchBody] = None) -> Dict[str, Any]:
+        st = state()
+        report = ingest_public(
+            st.pool,
+            limit=body.limit if body else 8,
+            validate=body.check if body else True,
+        )
+        return {**report.as_api(), **st.pool_view()}
+
+    @app.get("/proxy-pool/agent")
+    def get_agent_egress() -> Dict[str, Any]:
+        return state().agent_as_api()
+
+    @app.post("/proxy-pool/agent")
+    def agent_egress(body: Optional[ProxyAgentBody] = None) -> Dict[str, Any]:
+        st = state()
+        op = (body.op if body else "get").strip().lower()
+        if op == "get":
+            try:
+                lease = st.agent_get()
+            except PoolEmpty as exc:
+                raise HTTPException(status_code=409, detail="pool_empty") from exc
+            return {**lease.as_api(), **st.pool_view()}
+        if op == "next":
+            try:
+                lease = st.agent_next(reason=body.reason if body else "timeout")
+            except PoolEmpty as exc:
+                st.agent_lease = None
+                raise HTTPException(status_code=409, detail="pool_empty") from exc
+            return {**lease.as_api(), **st.pool_view()}
+        if op == "ok":
+            entry = st.agent_ok()
+            if entry is None:
+                raise HTTPException(status_code=409, detail="no_agent_lease")
+            return {"entry": entry.as_api(), **st.pool_view()}
+        raise HTTPException(status_code=400, detail="op_invalid")
+
+    @app.patch("/proxy-pool/{entry_id}")
+    def patch_proxy(entry_id: str, body: ProxyPatch) -> Dict[str, Any]:
+        try:
+            entry = state().pool.patch(
+                entry_id,
+                enabled=body.enabled,
+                note=body.note,
+                username=body.username,
+                password=body.password,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="proxy_not_found") from exc
+        return {"entry": entry.as_api(), **state().pool_view()}
+
+    @app.delete("/proxy-pool/{entry_id}")
+    def delete_proxy(entry_id: str) -> Dict[str, Any]:
+        try:
+            state().pool.delete(entry_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="proxy_not_found") from exc
+        return {"ok": True, **state().pool_view()}
+
+    @app.post("/proxy-pool/check")
+    def check_all_proxies(body: Optional[ProxyCheckBody] = None) -> Dict[str, Any]:
+        st = state()
+        results = []
+        for entry in st.pool.list_entries():
+            checked = _check_and_store(st, entry, body.url if body else None)
+            results.append(checked)
+        return {"results": results, **st.pool_view()}
+
+    @app.post("/proxy-pool/{entry_id}/check")
+    def check_one_proxy(entry_id: str, body: Optional[ProxyCheckBody] = None) -> Dict[str, Any]:
+        st = state()
+        entry = st.pool.get(entry_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="proxy_not_found")
+        checked = _check_and_store(st, entry, body.url if body else None)
+        return {"result": checked, **st.pool_view()}
+
+    @app.post("/proxy-pool/lease")
+    def lease_proxy() -> Dict[str, Any]:
+        try:
+            lease = state().pool.lease()
+        except PoolEmpty as exc:
+            raise HTTPException(status_code=409, detail="pool_empty") from exc
+        return lease.as_api()
+
+    @app.post("/proxy-pool/leases/{lease_id}/ok")
+    def lease_ok(lease_id: str) -> Dict[str, Any]:
+        try:
+            entry = state().pool.ok(lease_id)
+        except LeaseError as exc:
+            raise HTTPException(status_code=404, detail="lease_not_found") from exc
+        return {"entry": entry.as_api()}
+
+    @app.post("/proxy-pool/leases/{lease_id}/fail")
+    def lease_fail(lease_id: str, body: Optional[LeaseFailBody] = None) -> Dict[str, Any]:
+        try:
+            entry = state().pool.fail(lease_id, reason=body.reason if body else "")
+        except LeaseError as exc:
+            raise HTTPException(status_code=404, detail="lease_not_found") from exc
+        return {"entry": entry.as_api()}
+
     @app.post("/runs/{run_id}/probe")
     def probe(run_id: str, body: ProbeBody) -> Dict[str, Any]:
         st = state()
@@ -355,36 +563,27 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run_not_found")
         if not st.mitm.listening:
             raise HTTPException(status_code=409, detail="proxy_off")
-        curl = which_curl()
-        if not curl:
-            raise HTTPException(status_code=500, detail="curl_missing")
-        env = proxy_env(st.settings)
-        try:
-            completed = subprocess.run(
-                [
-                    curl,
-                    "-sS",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    "--max-time",
-                    "20",
-                    "-L",
-                    body.url,
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
+        result = rotate_http(st.pool, lambda lease: _send_probe(st, body.url, lease))
+        if result.error and result.status is None:
+            raise HTTPException(
+                status_code=502,
+                detail=result.error,
             )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {
             "url": body.url,
-            "exit_code": completed.returncode,
-            "http_code": completed.stdout.strip(),
-            "stderr": (completed.stderr or "")[-500:],
+            "http_code": "" if result.status is None else str(result.status),
+            "egress_proxy_id": result.egress_proxy_id,
+            "rotated": result.rotated,
+            "attempts": [
+                {
+                    "lease_id": item.lease_id,
+                    "proxy_id": item.proxy_id,
+                    "status": item.status,
+                    "error": item.error,
+                }
+                for item in result.attempts
+            ],
+            "error": result.error,
         }
 
     @app.post("/capture")
@@ -544,6 +743,84 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return capture_blob()
 
     return app
+
+
+def _check_and_store(st: AppState, entry: ProxyEntry, url: Optional[str]) -> Dict[str, Any]:
+    result = check_entry(entry, url)
+    stored = st.pool.record_check(
+        entry.id,
+        ok=result.ok,
+        latency_ms=result.latency_ms,
+        egress_ip=result.egress_ip,
+        error=result.error,
+    )
+    payload = stored.as_api()
+    payload["check"] = {
+        "ok": result.ok,
+        "latency_ms": result.latency_ms,
+        "egress_ip": result.egress_ip,
+        "error": result.error,
+        "url": result.url,
+    }
+    return payload
+
+
+def _send_probe(st: AppState, url: str, lease: Optional[Lease]) -> AttemptResult:
+    proxy = "http://{}:{}".format(st.settings.proxy_host, st.settings.proxy_port)
+    ca = st.settings.combined_ca if st.settings.combined_ca.exists() else None
+    verify: Any = str(ca) if ca is not None else False
+    headers: Dict[str, str] = {}
+    proxy_headers: Dict[str, str] = {}
+    if lease is not None:
+        headers[EGRESS_URL_HEADER] = lease.url
+        headers[EGRESS_ID_HEADER] = lease.proxy_id
+        proxy_headers[EGRESS_URL_HEADER] = lease.url
+        proxy_headers[EGRESS_ID_HEADER] = lease.proxy_id
+    try:
+        transport = httpx.HTTPTransport(
+            proxy=httpx.Proxy(proxy, headers=proxy_headers or None),
+        )
+        with httpx.Client(
+            verify=verify,
+            follow_redirects=True,
+            timeout=20.0,
+            transport=transport,
+        ) as client:
+            response = client.get(url, headers=headers)
+    except httpx.TimeoutException:
+        return AttemptResult(error="timeout")
+    except (httpx.ConnectError, httpx.ProxyError, httpx.NetworkError):
+        return AttemptResult(error="connect")
+    except httpx.RequestError:
+        return AttemptResult(error="connect")
+    if response.status_code == 407:
+        return AttemptResult(
+            status=407,
+            error="http_407",
+            headers=plain_headers({k: v for k, v in response.headers.items()}),
+            body=decode_body(response.content),
+        )
+    return AttemptResult(
+        status=response.status_code,
+        headers=plain_headers({k: v for k, v in response.headers.items()}),
+        body=decode_body(response.content),
+    )
+
+
+def _install_agent_skill() -> None:
+    src = Path(__file__).resolve().parents[3] / ".dsh" / "skills" / "proxy-pool" / "SKILL.md"
+    if not src.is_file():
+        return
+    dest = Path.home() / ".dsh" / "skills" / "proxy-pool" / "SKILL.md"
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        text = src.read_text(encoding="utf-8")
+        if dest.is_file() and dest.read_text(encoding="utf-8") == text:
+            return
+        dest.write_text(text, encoding="utf-8")
+    except OSError:
+        return
+
 
 
 def _apply_harness(st: AppState, proxied: bool) -> Optional[str]:

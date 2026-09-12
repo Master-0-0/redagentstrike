@@ -37,6 +37,7 @@ class HttpEvent:
     resp_body: str
     evidence_id: Optional[str]
     failed: bool
+    egress_proxy_id: Optional[str] = None
 
     def as_api(self, include_bodies: bool = True) -> Dict[str, Any]:
         return {
@@ -57,6 +58,7 @@ class HttpEvent:
             },
             "evidence_id": self.evidence_id,
             "failed": self.failed,
+            "egress_proxy_id": self.egress_proxy_id,
         }
 
 
@@ -120,6 +122,10 @@ class NetStore:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_net_http_run_ts ON net_http(run_id, ts)"
         )
+        try:
+            self._conn.execute("ALTER TABLE net_http ADD COLUMN egress_proxy_id VARCHAR")
+        except Exception:
+            pass
 
     def insert(self, event: HttpEvent) -> None:
         with self._lock:
@@ -129,8 +135,9 @@ class NetStore:
             """
             INSERT INTO net_http (
               id, run_id, ts, host, method, url, status, summary,
-              req_headers, req_body, resp_headers, resp_body, evidence_id, failed
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              req_headers, req_body, resp_headers, resp_body, evidence_id, failed,
+              egress_proxy_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 event.id,
@@ -147,6 +154,7 @@ class NetStore:
                 event.resp_body,
                 event.evidence_id,
                 event.failed,
+                event.egress_proxy_id,
             ],
         )
 
@@ -156,8 +164,8 @@ class NetStore:
                 raise RuntimeError("store_unavailable")
             row = self._conn.execute(
                 "SELECT id, run_id, ts, host, method, url, status, summary, "
-                "req_headers, req_body, resp_headers, resp_body, evidence_id, failed "
-                "FROM net_http WHERE id = ?",
+                "req_headers, req_body, resp_headers, resp_body, evidence_id, failed, "
+                "egress_proxy_id FROM net_http WHERE id = ?",
                 [event_id],
             ).fetchone()
             if row is None:
@@ -190,8 +198,8 @@ class NetStore:
                 params.append("%{}%".format(host.strip().lower()))
             sql = (
                 "SELECT id, run_id, ts, host, method, url, status, summary, "
-                "req_headers, req_body, resp_headers, resp_body, evidence_id, failed "
-                "FROM net_http WHERE {} ORDER BY ts ASC LIMIT ?"
+                "req_headers, req_body, resp_headers, resp_body, evidence_id, failed, "
+                "egress_proxy_id FROM net_http WHERE {} ORDER BY ts ASC LIMIT ?"
             ).format(" AND ".join(clauses))
             params.append(limit)
             rows = self._conn.execute(sql, params).fetchall()
@@ -258,6 +266,7 @@ class NetStore:
             resp_body=row[11] or "",
             evidence_id=row[12],
             failed=bool(row[13]),
+            egress_proxy_id=row[14] if len(row) > 14 else None,
         )
 
 

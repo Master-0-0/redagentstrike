@@ -6,6 +6,14 @@ def test_parse_ready_url_strips_lan_suffix():
     assert parse_ready_url(text) == "http://127.0.0.1:3081/?token=abc_DEF-123"
 
 
+def test_parse_ready_url_uses_latest_printed_line():
+    text = (
+        "dsh web: http://127.0.0.1:3081/?token=oldToken_123\n"
+        "dsh web: http://127.0.0.1:3081/?token=newToken_456\n"
+    )
+    assert parse_ready_url(text) == "http://127.0.0.1:3081/?token=newToken_456"
+
+
 def test_harness_apply_is_noop_when_unmanaged(settings):
     manager = HarnessManager(settings)
     manager.apply(True)

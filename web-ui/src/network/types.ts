@@ -43,6 +43,7 @@ export type NetworkEvent = {
   evidence_id: string | null
   failed: boolean
   tool_call: ToolCallMatch | null
+  egress_proxy_id?: string | null
 }
 
 export type CaptureInfo = {
@@ -91,4 +92,54 @@ export type ReplayResult = {
   headers: Record<string, string>
   body: string
   via_proxy: boolean
+}
+
+export type ProxyScheme = 'http' | 'https' | 'socks5'
+
+export type ProxyEmpty = 'no_entries' | 'all_disabled' | 'all_cooling' | 'ok'
+
+export type ProxyEntry = {
+  id: string
+  scheme: ProxyScheme
+  host: string
+  port: number
+  username: string
+  has_password: boolean
+  enabled: boolean
+  source: string
+  note: string
+  fail_streak: number
+  cooling: boolean
+  cooldown_until: string | null
+  last_ok_at: string | null
+  last_fail_at: string | null
+  alive: boolean | null
+  latency_ms: number | null
+  egress_ip: string | null
+  checked_at: string | null
+  check_error: string | null
+}
+
+export type ProxyCounts = {
+  total: number
+  nodes: number
+  enabled: number
+  cooling: number
+  alive: number
+  dead: number
+  unknown: number
+  latency_ms: number | null
+}
+
+export type ProxyAgentLease = {
+  lease_id: string | null
+  proxy_id: string | null
+  url: string | null
+}
+
+export type ProxyPoolPayload = {
+  entries: ProxyEntry[]
+  counts: ProxyCounts
+  empty: ProxyEmpty
+  agent?: ProxyAgentLease
 }

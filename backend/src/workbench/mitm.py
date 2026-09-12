@@ -68,6 +68,9 @@ class MitmManager:
         env["WORKBENCH_HOLD_URL"] = self.ingest_url.replace(
             "/internal/net/http", "/internal/net/hold"
         )
+        env["WORKBENCH_EGRESS_URL"] = self.ingest_url.replace(
+            "/internal/net/http", "/internal/net/egress"
+        )
         existing = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = str(src_root) + (("" + os.pathsep + existing) if existing else "")
         cmd: List[str] = [

@@ -35,6 +35,8 @@
 
       Operate only in environments you are authorized to change. Refuse unauthorized access, exploitation, or attacks against systems you do not own or have explicit permission to test.
 
+      When an authorized HTTP fuzz or probe times out or cannot connect, load the `proxy-pool` skill and POST `http://127.0.0.1:8787/proxy-pool/agent` with op=next, then retry. Do not rotate on 403/429. Explorers may do the same; they still must not call `blackboard`.
+
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
   config:

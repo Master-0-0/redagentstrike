@@ -1,4 +1,11 @@
-import type { NetworkEvent, NetworkPayload, ReplayResult, RequestDraft } from './types'
+import type {
+  NetworkEvent,
+  NetworkPayload,
+  ProxyPoolPayload,
+  ProxyScheme,
+  ReplayResult,
+  RequestDraft,
+} from './types'
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -76,4 +83,63 @@ export async function health(): Promise<{
   harness?: { url?: string | null; proxied?: boolean }
 }> {
   return parse(await fetch('/api/health', { cache: 'no-store' }))
+}
+
+export async function fetchProxyPool(): Promise<ProxyPoolPayload> {
+  return parse(await fetch('/api/proxy-pool', { cache: 'no-store' }))
+}
+
+export async function addProxy(body: {
+  scheme: ProxyScheme
+  host: string
+  port: number
+  username?: string
+  password?: string
+}): Promise<ProxyPoolPayload> {
+  return parse(await fetch('/api/proxy-pool', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(body),
+  }))
+}
+
+export async function patchProxy(
+  id: string,
+  body: { enabled?: boolean; note?: string; username?: string; password?: string },
+): Promise<ProxyPoolPayload> {
+  return parse(await fetch(`/api/proxy-pool/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(body),
+  }))
+}
+
+export async function deleteProxy(id: string): Promise<ProxyPoolPayload> {
+  return parse(await fetch(`/api/proxy-pool/${encodeURIComponent(id)}`, { method: 'DELETE' }))
+}
+
+export async function checkProxy(id: string): Promise<ProxyPoolPayload> {
+  return parse(await fetch(`/api/proxy-pool/${encodeURIComponent(id)}/check`, { method: 'POST' }))
+}
+
+export async function checkAllProxies(): Promise<ProxyPoolPayload> {
+  return parse(await fetch('/api/proxy-pool/check', { method: 'POST' }))
+}
+
+export type ProxyFetchPayload = ProxyPoolPayload & {
+  fetched: number
+  tried: number
+  added: number
+  skipped: number
+  purged: number
+  sources: string[]
+  errors: { source: string; error: string }[]
+}
+
+export async function fetchPublicProxies(limit = 8): Promise<ProxyFetchPayload> {
+  return parse(await fetch('/api/proxy-pool/fetch', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ limit, check: true }),
+  }))
 }

@@ -24,9 +24,19 @@ except Exception:  # pragma: no cover
     host_from_url = None  # type: ignore
     decode_body = None  # type: ignore
 
+try:
+    from workbench.egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER  # type: ignore
+except Exception:  # pragma: no cover
+    EGRESS_URL_HEADER = "X-Workbench-Egress"
+    EGRESS_ID_HEADER = "X-Workbench-Egress-Id"
+
 
 INGEST = os.environ.get("WORKBENCH_INGEST_URL", "http://127.0.0.1:8787/internal/net/http")
 HOLD = os.environ.get("WORKBENCH_HOLD_URL", "http://127.0.0.1:8787/internal/net/hold")
+EGRESS = os.environ.get(
+    "WORKBENCH_EGRESS_URL",
+    INGEST.split("/internal/", 1)[0] + "/internal/net/egress" if "/internal/" in INGEST else "http://127.0.0.1:8787/internal/net/egress",
+)
 STATUS = os.environ.get(
     "WORKBENCH_CAPTURE_URL",
     INGEST.split("/internal/", 1)[0] + "/capture" if "/internal/" in INGEST else "http://127.0.0.1:8787/capture",
@@ -89,6 +99,82 @@ def _json_post(url: str, payload: Dict[str, Any], timeout: float) -> Optional[Di
     return parsed if isinstance(parsed, dict) else None
 
 
+def _header_get(headers, name: str) -> Optional[str]:
+    try:
+        return headers.get(name)
+    except Exception:
+        return None
+
+
+def _header_pop(headers, name: str) -> Optional[str]:
+    value = _header_get(headers, name)
+    if value is None:
+        return None
+    try:
+        del headers[name]
+    except Exception:
+        try:
+            headers.pop(name, None)
+        except Exception:
+            pass
+    return str(value)
+
+
+def _set_via(flow, url: str) -> None:
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    host = parsed.hostname
+    if not host:
+        return
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    scheme = parsed.scheme or "http"
+    spec = None
+    try:
+        from mitmproxy.net.server_spec import ServerSpec
+
+        try:
+            spec = ServerSpec((scheme, (host, port)))
+        except TypeError:
+            spec = ServerSpec(address=(host, port), scheme=scheme)
+    except Exception:
+        return
+    try:
+        flow.server_conn.via = spec
+    except Exception:
+        pass
+
+
+def _local_control(flow) -> bool:
+    host = (getattr(flow.request, "host", None) or "").lower()
+    port = getattr(flow.request, "port", None)
+    return host in {"127.0.0.1", "localhost"} and port in {8787, 5173, 3080, 3081}
+
+
+def _active_egress() -> tuple:
+    payload = _json_get(EGRESS, timeout=0.4)
+    if not payload:
+        return None, None
+    url = payload.get("url") or None
+    proxy_id = payload.get("proxy_id") or None
+    return url, proxy_id
+
+
+def _apply_egress(flow) -> None:
+    if _local_control(flow):
+        return
+    url = _header_pop(flow.request.headers, EGRESS_URL_HEADER)
+    proxy_id = _header_pop(flow.request.headers, EGRESS_ID_HEADER)
+    if not url:
+        url, proxy_id = _active_egress()
+    if url:
+        _set_via(flow, url)
+    if proxy_id:
+        flow.metadata["egress_proxy_id"] = proxy_id
+    elif url and "egress_proxy_id" not in flow.metadata:
+        flow.metadata["egress_proxy_id"] = None
+
+
 def _ingest(flow, failed: bool) -> None:
     request = flow.request
     method = (request.method or "").upper()
@@ -120,6 +206,7 @@ def _ingest(flow, failed: bool) -> None:
             "resp_headers": resp_headers,
             "resp_body": resp_body,
             "already_redacted": False,
+            "egress_proxy_id": flow.metadata.get("egress_proxy_id"),
         },
         timeout=60,
     )
@@ -151,11 +238,15 @@ def _apply_decision(flow, decision: Dict[str, Any]) -> None:
 
 
 class HttpCapture:
+    def http_connect(self, flow) -> None:
+        _apply_egress(flow)
+
     def request(self, flow) -> None:
         request = flow.request
         method = (request.method or "").upper()
         if method == "CONNECT":
             return
+        _apply_egress(flow)
         host = (request.host or "").lower()
         if host in {"127.0.0.1", "localhost"} and request.port in {8787, 5173}:
             return

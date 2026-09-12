@@ -417,6 +417,7 @@ function EventDetail(props: {
         <dt>url</dt><dd className="mono">{event.join.url || '—'}</dd>
         <dt>status</dt><dd>{event.join.status ?? '无响应'}</dd>
         <dt>host</dt><dd>{event.host || '—'}</dd>
+        <dt>出口</dt><dd className="mono">{event.egress_proxy_id || '本机 / 未换 IP'}</dd>
       </dl>
       <h2>请求头</h2>
       <pre>{formatHeaders(event.truncated.req_headers)}</pre>

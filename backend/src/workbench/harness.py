@@ -25,8 +25,8 @@ READY_RE = re.compile(
 
 
 def parse_ready_url(text: str) -> Optional[str]:
-    match = READY_RE.search(text)
-    return match.group(1) if match else None
+    matches = READY_RE.findall(text)
+    return matches[-1] if matches else None
 
 
 class HarnessManager:
@@ -41,6 +41,10 @@ class HarnessManager:
     def status(self) -> dict:
         pid = self._listen_pid()
         proxied = self._pid_is_proxied(pid) if pid else False
+        if pid:
+            found = self._url_from_log()
+            if found:
+                self.url = found
         return {
             "managed": self.settings.manage_dsh,
             "proxied": proxied,

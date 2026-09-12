@@ -455,6 +455,31 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   max-height: min(52vh, 720px);
   overflow: auto;
 }
+.pp-row {
+  grid-template-columns: 64px minmax(0, 1fr) 56px 64px 48px;
+}
+.pp-head {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 56px 64px 48px;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #5c6b8a;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(0, 47, 167, 0.08);
+}
+.pp-latency {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #3d4a73;
+}
+.pp-auth {
+  font-size: 12px;
+  color: #5c6b8a;
+  text-align: right;
+}
+
 @media (max-width: 960px) {
   .nt-body { grid-template-columns: 1fr; }
   .nt-detail { border-left: 0; border-top: 1px solid rgba(0, 47, 167, 0.12); max-height: 40vh; }
