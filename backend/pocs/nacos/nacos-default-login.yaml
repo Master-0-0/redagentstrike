@@ -1,0 +1,24 @@
+id: nacos-default-login
+
+info:
+  name: Nacos 默认口令 nacos/nacos
+  author: workbench
+  severity: critical
+  description: 使用 Nacos 默认账号口令请求登录接口，并检查是否返回访问令牌。
+  tags: [nacos, default-login]
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/nacos/v1/auth/login"
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+      Accept: application/json
+    body: "username=nacos&password=nacos"
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        part: body
+        words: ['"accessToken"']

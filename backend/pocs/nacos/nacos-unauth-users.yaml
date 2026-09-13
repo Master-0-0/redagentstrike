@@ -1,0 +1,23 @@
+id: nacos-unauth-users
+
+info:
+  name: Nacos 用户列表未授权访问
+  author: workbench
+  severity: high
+  description: 检查 Nacos 用户列表接口是否可在未认证状态下访问。
+  tags: [nacos, exposure, unauth]
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/nacos/v1/auth/users?pageNo=1&pageSize=1"
+    headers:
+      Accept: application/json
+    matchers-condition: and
+    matchers:
+      - type: status
+        status: [200]
+      - type: word
+        part: body
+        words: ['"username"', '"pageItems"']
+        condition: or

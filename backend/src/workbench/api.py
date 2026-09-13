@@ -20,6 +20,7 @@ from .netstore import HttpEvent, NetStore
 from .proxycheck import check_entry
 from .proxyfetch import ingest_public
 from .proxypool import Lease, LeaseError, PoolEmpty, ProxyEntry, ProxyPool
+from .poc import TemplateError, list_templates, read_template, scan_templates
 from .redact import decode_body, host_from_url, plain_headers, summarize
 
 
@@ -105,6 +106,13 @@ class ProxyFetchBody(BaseModel):
 class ProxyAgentBody(BaseModel):
     op: str = "get"
     reason: str = "timeout"
+
+
+class PocScanBody(BaseModel):
+    target: str
+    templates: List[str] = Field(default_factory=list)
+    timeout: float = Field(default=10.0, ge=1, le=30, allow_inf_nan=False)
+    concurrency: int = Field(default=4, ge=1, le=10)
 
 
 class AppState:
@@ -690,6 +698,36 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if draft is None:
             return {"draft": None, "stale": True}
         return {"draft": draft, "stale": False}
+
+    @app.get("/poc/templates")
+    def poc_templates() -> Dict[str, Any]:
+        templates = list_templates(state().settings.poc_templates_dir)
+        categories = sorted({item["category"] for item in templates})
+        return {"categories": categories, "templates": templates}
+
+    @app.get("/poc/templates/{template_id:path}")
+    def poc_template(template_id: str) -> Dict[str, Any]:
+        try:
+            return read_template(state().settings.poc_templates_dir, template_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="template_not_found") from exc
+        except TemplateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/poc/scan")
+    def poc_scan(body: PocScanBody) -> Dict[str, Any]:
+        try:
+            return scan_templates(
+                state().settings.poc_templates_dir,
+                body.target,
+                body.templates,
+                timeout=body.timeout,
+                concurrency=body.concurrency,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="template_not_found") from exc
+        except TemplateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/capture/replay")
     def replay(body: RequestDraft) -> Dict[str, Any]:

@@ -44,6 +44,10 @@ class Settings:
         return self.data_dir / "mitm"
 
     @property
+    def poc_templates_dir(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "pocs"
+
+    @property
     def combined_ca(self) -> Path:
         return self.data_dir / "combined-ca.pem"
 

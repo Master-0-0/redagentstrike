@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DSH_URL_EVENT, DEFAULT_DSH_URL, persistDshUrl, readStoredDshUrl } from './dshUrl'
 import { NetworkTimeline } from './network/NetworkTimeline'
+import { PocScan } from './network/PocScan'
 import { ProxyPool } from './network/ProxyPool'
 
 export type RouteId =
@@ -8,6 +9,7 @@ export type RouteId =
   | 'approval'
   | 'evidence'
   | 'network'
+  | 'poc'
   | 'proxypool'
   | 'settings'
 
@@ -16,6 +18,7 @@ const NAV: { id: RouteId; label: string; hint: string }[] = [
   { id: 'approval', label: '审批', hint: '高危动作确认' },
   { id: 'evidence', label: '证据', hint: '会话取证浏览' },
   { id: 'network', label: '网络时间线', hint: '捕获 / 拦截 / 重放' },
+  { id: 'poc', label: 'poc 扫描', hint: '漏洞验证模板' },
   { id: 'proxypool', label: '代理池', hint: '出站代理条目' },
   { id: 'settings', label: '设置', hint: 'Harness 连接' },
 ]
@@ -138,6 +141,7 @@ export function App() {
           <Placeholder title="证据" detail="会话产物、截图与工具输出会在这里按 Run 归档浏览。" />
         )}
         {route === 'network' && <NetworkTimeline />}
+        {route === 'poc' && <PocScan />}
         {route === 'proxypool' && <ProxyPool />}
         {route === 'settings' && (
           <SettingsPanel
@@ -251,6 +255,14 @@ function icon(id: RouteId) {
       return (
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M4 16h4l2-6 3 10 2-8h5" />
+        </svg>
+      )
+    case 'poc':
+      return (
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
         </svg>
       )
     case 'proxypool':

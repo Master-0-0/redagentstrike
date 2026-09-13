@@ -143,3 +143,53 @@ export type ProxyPoolPayload = {
   empty: ProxyEmpty
   agent?: ProxyAgentLease
 }
+
+export type PocTemplate = {
+  template_id: string
+  category: string
+  id: string
+  name: string
+  severity: string
+  author: string
+  description: string
+  tags: string[]
+}
+
+export type PocTemplateDetail = PocTemplate & { content: string }
+
+export type PocMatcherResult = {
+  type: string
+  part: string
+  matched: boolean
+  detail: string
+}
+
+export type PocScanAttempt = {
+  url: string
+  method: string
+  status: number | null
+  duration_ms: number
+  matched: boolean
+  matchers: PocMatcherResult[]
+  error: string | null
+}
+
+export type PocScanResult = {
+  template_id: string
+  id: string
+  name: string
+  severity: string
+  matched: boolean
+  image: string | null
+  body: string | null
+  image_error: string | null
+  attempts: PocScanAttempt[]
+}
+
+export type PocScanReport = {
+  target: string
+  duration_ms: number
+  matched: number
+  total: number
+  results: PocScanResult[]
+}

@@ -1,6 +1,9 @@
 import type {
   NetworkEvent,
   NetworkPayload,
+  PocScanReport,
+  PocTemplate,
+  PocTemplateDetail,
   ProxyPoolPayload,
   ProxyScheme,
   ReplayResult,
@@ -141,5 +144,27 @@ export async function fetchPublicProxies(limit = 8): Promise<ProxyFetchPayload> 
     method: 'POST',
     headers: jsonHeaders,
     body: JSON.stringify({ limit, check: true }),
+  }))
+}
+
+export async function fetchPocTemplates(): Promise<{ categories: string[]; templates: PocTemplate[] }> {
+  return parse(await fetch('/api/poc/templates', { cache: 'no-store' }))
+}
+
+export async function fetchPocTemplate(templateId: string): Promise<PocTemplateDetail> {
+  const path = templateId.split('/').map(encodeURIComponent).join('/')
+  return parse(await fetch(`/api/poc/templates/${path}`, { cache: 'no-store' }))
+}
+
+export async function runPocScan(body: {
+  target: string
+  templates: string[]
+  timeout: number
+  concurrency: number
+}): Promise<PocScanReport> {
+  return parse(await fetch('/api/poc/scan', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(body),
   }))
 }
