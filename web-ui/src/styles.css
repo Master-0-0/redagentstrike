@@ -286,6 +286,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   letter-spacing: 0.04em;
   color: var(--luckin);
 }
+.nt-source { display: inline-block; margin-right: 6px; padding: 1px 5px; border-radius: 4px; background: #e4eaff; color: var(--luckin); font-size: 10px; }
 .nt-summary {
   font-size: 13px;
   overflow: hidden;
@@ -456,16 +457,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   overflow: auto;
 }
 .page-poc { padding-bottom: 18px; }
+.poc-proxy-badge { max-width: 320px; overflow-wrap: anywhere; }
 .poc-toolbar {
   display: flex; align-items: end; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
 }
 .poc-toolbar label {
   display: flex; flex-direction: column; gap: 4px; color: #3d4a73; font-size: 11px;
 }
-.poc-toolbar input {
+.poc-toolbar input, .poc-toolbar select {
   width: 110px; height: 36px; border: 1px solid rgba(0, 47, 167, 0.18);
   border-radius: 8px; padding: 0 10px; font: inherit; color: var(--text); background: #fff;
 }
+.poc-toolbar select { width: auto; }
 .poc-toolbar .poc-target { flex: 1; min-width: 260px; }
 .poc-toolbar .poc-target input { width: 100%; }
 .poc-workspace {

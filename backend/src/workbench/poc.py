@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 import yaml
 from .poc_evidence import capture_response_image, response_packet
+from .poc_transport import PocTransportError, send_request
 
 
 class TemplateError(ValueError):
@@ -49,7 +50,12 @@ def scan_templates(
     template_ids: Iterable[str],
     timeout: float = 10.0,
     concurrency: int = 4,
+    pool=None,
+    proxy_mode: str = 'fallback',
+    recording=None,
 ) -> Dict[str, Any]:
+    if proxy_mode not in {'direct', 'fallback', 'pool'}:
+        raise TemplateError('proxy_mode_invalid')
     base_url = _normalize_target(target)
     unique_ids = list(dict.fromkeys(str(item) for item in template_ids))
     if not unique_ids:
@@ -61,9 +67,10 @@ def scan_templates(
     loaded = [(template_id, _load_file(root, template_id)) for template_id in unique_ids]
     started = time.perf_counter()
     results: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=min(concurrency, len(loaded))) as pool:
+    with ThreadPoolExecutor(max_workers=min(concurrency, len(loaded))) as executor:
         futures = {
-            pool.submit(_scan_one, base_url, template_id, template, timeout): template_id
+            executor.submit(_scan_one, base_url, template_id, template, timeout, pool, proxy_mode,
+                            recording.template(template_id) if recording else None): template_id
             for template_id, template in loaded
         }
         for future in as_completed(futures):
@@ -72,6 +79,9 @@ def scan_templates(
     results.sort(key=lambda item: order[item["template_id"]])
     return {
         "target": base_url,
+        "proxy_mode": proxy_mode,
+        "scan_id": recording.scan_id if recording else None,
+        "recording_warnings": recording.warnings if recording else [],
         "duration_ms": round((time.perf_counter() - started) * 1000),
         "matched": sum(1 for item in results if item["matched"]),
         "total": len(results),
@@ -84,6 +94,9 @@ def _scan_one(
     template_id: str,
     template: Dict[str, Any],
     timeout: float,
+    pool=None,
+    proxy_mode='fallback',
+    recording=None,
 ) -> Dict[str, Any]:
     info = template["info"]
     attempts: List[Dict[str, Any]] = []
@@ -106,9 +119,10 @@ def _scan_one(
                 body = _render(str(request.get("body", "")), base_url)
                 began = time.perf_counter()
                 try:
-                    response = client.request(
+                    response, transport_attempts = send_request(client, pool, proxy_mode, timeout,
                         method,
                         url,
+                        recording=recording,
                         headers=headers,
                         content=body.encode("utf-8") if body else None,
                         follow_redirects=bool(request.get("redirects", False)),
@@ -126,13 +140,14 @@ def _scan_one(
                         "matched": attempt_matched,
                         "matchers": matcher_results,
                         "error": None,
+                        "transport_attempts": transport_attempts,
                     })
                     if attempt_matched:
                         matched = True
                         evidence_body = response_packet(response)
                         evidence_image, image_error = capture_response_image(str(response.url), method, evidence_body)
                         break
-                except httpx.RequestError as exc:
+                except PocTransportError as exc:
                     attempts.append({
                         "url": url,
                         "method": method,
@@ -140,7 +155,8 @@ def _scan_one(
                         "duration_ms": round((time.perf_counter() - began) * 1000),
                         "matched": False,
                         "matchers": [],
-                        "error": exc.__class__.__name__,
+                        "error": exc.error,
+                        "transport_attempts": exc.attempts,
                     })
             if matched:
                 break

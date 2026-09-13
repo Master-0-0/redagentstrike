@@ -311,7 +311,7 @@ export function NetworkTimeline() {
                   >
                     <time>{formatTs(event.ts)}</time>
                     <span className="nt-method">{event.join.method || '?'}</span>
-                    <span className="nt-summary">{event.host}{urlPath(event.join.url)}</span>
+                    <span className="nt-summary">{event.source === 'poc' && <span className="nt-source">PoC</span>}{event.host}{urlPath(event.join.url)}</span>
                     <span className={statusClass(event)}>{statusLabel(event)}</span>
                   </button>
                 </li>
@@ -418,6 +418,15 @@ function EventDetail(props: {
         <dt>status</dt><dd>{event.join.status ?? '无响应'}</dd>
         <dt>host</dt><dd>{event.host || '—'}</dd>
         <dt>出口</dt><dd className="mono">{event.egress_proxy_id || '本机 / 未换 IP'}</dd>
+        {event.source === 'poc' && <>
+          <dt>来源</dt><dd>PoC 扫描（请求记录）</dd>
+          <dt>扫描</dt><dd className="mono">{event.scan_id}</dd>
+          <dt>模板</dt><dd className="mono">{event.template_id}</dd>
+          <dt>尝试</dt><dd>{event.attempt_index}</dd>
+          <dt>代理地址</dt><dd className="mono">{event.proxy_address || '直连'}</dd>
+          <dt>耗时</dt><dd>{event.duration_ms} ms</dd>
+          <dt>错误</dt><dd>{event.error || '—'}</dd>
+        </>}
       </dl>
       <h2>请求头</h2>
       <pre>{formatHeaders(event.truncated.req_headers)}</pre>

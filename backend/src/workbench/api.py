@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +21,7 @@ from .proxycheck import check_entry
 from .proxyfetch import ingest_public
 from .proxypool import Lease, LeaseError, PoolEmpty, ProxyEntry, ProxyPool
 from .poc import TemplateError, list_templates, read_template, scan_templates
+from .poc_recording import PocRecorder, ScanRecording
 from .redact import decode_body, host_from_url, plain_headers, summarize
 
 
@@ -113,6 +114,7 @@ class PocScanBody(BaseModel):
     templates: List[str] = Field(default_factory=list)
     timeout: float = Field(default=10.0, ge=1, le=30, allow_inf_nan=False)
     concurrency: int = Field(default=4, ge=1, le=10)
+    proxy_mode: Literal['direct', 'fallback', 'pool'] = 'fallback'
 
 
 class AppState:
@@ -127,7 +129,17 @@ class AppState:
         self.harness = HarnessManager(settings)
         self.pool = ProxyPool(settings.control_db)
         self.agent_lease: Optional[Lease] = None
+        self.poc_recorder = PocRecorder(self)
         _install_agent_skill()
+
+    def store_http_event(self, event: HttpEvent) -> None:
+        if not self.net.available:
+            self.net.reopen()
+        self.net.insert(event)
+        self.replays.put(event.id, {
+            'method': event.method, 'url': event.url, 'host': event.host,
+            'headers': event.req_headers, 'body': event.req_body,
+        })
 
     def pool_view(self) -> Dict[str, Any]:
         return {**self.pool.snapshot(), "agent": self.agent_as_api()}
@@ -168,6 +180,7 @@ class AppState:
         return entry
 
     def close(self) -> None:
+        self.poc_recorder.invalidate()
         self.holds.release_all("drop")
         self.mitm.close()
         self.harness.close()
@@ -341,6 +354,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         st = state()
         if st.control.get_run(run_id) is None:
             raise HTTPException(status_code=404, detail="run_not_found")
+        st.poc_recorder.invalidate()
         st.mitm.stop()
         run = st.control.end_run(run_id)
         return {"run": run.as_dict(), "capture": st.mitm.status()}
@@ -424,17 +438,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             failed=failed,
             egress_proxy_id=body.egress_proxy_id,
         )
-        st.net.insert(event)
-        st.replays.put(
-            event.id,
-            {
-                "method": event.method,
-                "url": body.url,
-                "host": host,
-                "headers": {str(k): str(v) for k, v in (body.req_headers or {}).items()},
-                "body": body.req_body or "",
-            },
-        )
+        st.store_http_event(event)
         return {"accepted": True, "id": event.id}
 
     @app.get("/internal/net/egress")
@@ -597,6 +601,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.post("/capture")
     def set_capture(body: CaptureToggle) -> Dict[str, Any]:
         st = state()
+        with st.poc_recorder.lock:
+            st.poc_recorder.paused = True
+            st.poc_recorder.invalidate()
         error = None
         if body.enabled:
             run = st.control.ensure_open_run()
@@ -613,6 +620,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             st.holds.set_enabled(False)
             st.mitm.stop()
             error = _apply_harness(st, False)
+        st.poc_recorder.paused = False
         return {
             "capture": capture_blob(),
             "run": (session_run().as_dict() if session_run() else None),
@@ -666,10 +674,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if not st.net.available:
             st.net.reopen()
         try:
-            deleted = st.net.clear()
+            with st.poc_recorder.lock:
+                st.poc_recorder.invalidate()
+                deleted = st.net.clear()
+                st.replays.clear()
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
-        st.replays.clear()
         return {"ok": True, "deleted": deleted}
 
     @app.get("/network/events/{event_id}")
@@ -723,6 +733,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 body.templates,
                 timeout=body.timeout,
                 concurrency=body.concurrency,
+                pool=state().pool,
+                proxy_mode=body.proxy_mode,
+                recording=ScanRecording(state().poc_recorder),
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="template_not_found") from exc

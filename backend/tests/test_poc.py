@@ -62,7 +62,7 @@ def test_scan_connection_failure_is_not_clean_result(client, monkeypatch):
     monkeypatch.setattr(httpx.Client, 'request', fail)
     # Use the executor directly because TestClient itself uses httpx.Client.request.
     root = client.app.state.wb.settings.poc_templates_dir
-    report = scan_templates(root, 'http://127.0.0.1:1', ['nacos/nacos-unauth-users.yaml'])
+    report = scan_templates(root, 'http://127.0.0.1:1', ['nacos/nacos-unauth-users.yaml'], proxy_mode='direct')
     assert report['matched'] == 0
     assert report['results'][0]['attempts'][0]['error'] == 'ConnectError'
 

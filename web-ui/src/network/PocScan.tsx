@@ -12,11 +12,28 @@ export function PocScan() {
   const [target, setTarget] = useState('')
   const [timeout, setTimeoutValue] = useState(10)
   const [concurrency, setConcurrency] = useState(4)
+  const [proxyMode, setProxyMode] = useState<'direct' | 'fallback' | 'pool'>('fallback')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [report, setReport] = useState<PocScanReport | null>(null)
   const [preview, setPreview] = useState<{ image: string; name: string } | null>(null)
+
+  const proxySummary = useMemo(() => {
+    const addresses = new Set<string>()
+    let rotations = 0
+    for (const result of report?.results ?? []) {
+      for (const attempt of result.attempts) {
+        const routes = (attempt.transport_attempts ?? []).filter((route) => route.via === 'direct' || route.proxy_id)
+        routes.forEach((route, index) => {
+          if (route.via !== 'pool' || !route.proxy_id) return
+          addresses.add(route.egress_ip || route.proxy_host || '地址未知')
+          if (index > 0) rotations += 1
+        })
+      }
+    }
+    return { addresses: [...addresses], rotations }
+  }, [report])
 
   const grouped = useMemo(() => {
     const groups = new Map<string, PocTemplate[]>()
@@ -107,13 +124,14 @@ export function PocScan() {
     setReport(null)
     try {
       const next = await runPocScan({
+        proxy_mode: proxyMode,
         target: target.trim(),
         templates: [...checked],
         timeout,
         concurrency,
       })
       setReport(next)
-      setNotice(`扫描完成：${next.total} 个模板，命中 ${next.matched} 个。`)
+      setNotice(`扫描完成：${next.total} 个模板，命中 ${next.matched} 个。${(next.recording_warnings ?? []).join(' ')}`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '扫描失败')
     } finally {
@@ -129,6 +147,12 @@ export function PocScan() {
           <p>按 nuclei 的模板化思路管理 YAML PoC，选择模板后对授权目标执行 HTTP 验证。</p>
         </div>
         <div className="nt-badges">
+          <span className="nt-badge poc-proxy-badge" title="本次扫描使用的代理地址，优先显示代理池已检测的出口 IP，否则显示节点主机地址；扫描完成后更新。">
+            已轮换 IP {proxySummary.addresses.join('、') || '—'}
+          </span>
+          <span className="nt-badge" title="本次扫描各请求的切换次数之和：直连失败转代理或代理失败换节点计一次；首次领取、池为空不计。">
+            轮换 {proxySummary.rotations} 次
+          </span>
           <span className="nt-badge">模板 {templates.length}</span>
           <span className="nt-badge">已选 {checked.size}</span>
           {report && <span className={`nt-badge ${report.matched ? 'is-off' : 'is-on'}`}>命中 {report.matched}</span>}
@@ -151,6 +175,13 @@ export function PocScan() {
         <button type="button" className="btn-primary" disabled={busy || loading} onClick={() => void scan()}>
           {busy ? '扫描中…' : '开始扫描'}
         </button>
+        <label>访问方式
+          <select value={proxyMode} disabled={busy} onChange={(event) => setProxyMode(event.target.value as typeof proxyMode)}>
+            <option value="fallback">直连失败后轮换代理</option>
+            <option value="pool">通过代理池（最多 3 个节点）</option>
+            <option value="direct">仅直连</option>
+          </select>
+        </label>
       </div>
 
       {notice && <p className="nt-notice" role="status">{notice}</p>}
@@ -236,6 +267,12 @@ export function PocScan() {
                 <dl key={`${attempt.url}-${index}`}>
                   <dt>请求</dt><dd className="mono">{attempt.method} {attempt.url}</dd>
                   <dt>状态</dt><dd>{attempt.status ?? attempt.error ?? '—'} · {attempt.duration_ms}ms</dd>
+                  {attempt.transport_attempts?.map((route, routeIndex) => (
+                    <div className="poc-matcher" key={`route-${routeIndex}`}>
+                      第 {routeIndex + 1} 次：{route.via === 'direct' ? '直连' : `代理 ${route.proxy_id ?? '未领取'}`} · {route.error ?? route.status}
+                      {route.network_event_id && <span> · 已记录到网络时间线</span>}
+                    </div>
+                  ))}
                   {attempt.matchers.map((matcher, matcherIndex) => <div className="poc-matcher" key={matcherIndex}>{matcher.type} / {matcher.part}：{matcher.matched ? '匹配' : '未匹配'}</div>)}
                 </dl>
               ))}

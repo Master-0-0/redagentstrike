@@ -44,6 +44,13 @@ export type NetworkEvent = {
   failed: boolean
   tool_call: ToolCallMatch | null
   egress_proxy_id?: string | null
+  source?: string | null
+  scan_id?: string | null
+  template_id?: string | null
+  attempt_index?: number | null
+  proxy_address?: string | null
+  duration_ms?: number | null
+  error?: string | null
 }
 
 export type CaptureInfo = {
@@ -165,6 +172,7 @@ export type PocMatcherResult = {
 }
 
 export type PocScanAttempt = {
+  transport_attempts?: { via: 'direct' | 'pool'; proxy_id: string | null; proxy_host?: string | null; egress_ip?: string | null; lease_id: string | null; status: number | null; error: string | null; network_event_id?: string | null; network_requests?: {network_event_id: string | null; url: string; method: string; attempt_index: number}[] }[]
   url: string
   method: string
   status: number | null
@@ -187,6 +195,8 @@ export type PocScanResult = {
 }
 
 export type PocScanReport = {
+  scan_id?: string | null
+  recording_warnings?: string[]
   target: string
   duration_ms: number
   matched: number

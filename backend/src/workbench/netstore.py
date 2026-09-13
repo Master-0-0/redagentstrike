@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -38,6 +38,7 @@ class HttpEvent:
     evidence_id: Optional[str]
     failed: bool
     egress_proxy_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def as_api(self, include_bodies: bool = True) -> Dict[str, Any]:
         return {
@@ -59,6 +60,7 @@ class HttpEvent:
             "evidence_id": self.evidence_id,
             "failed": self.failed,
             "egress_proxy_id": self.egress_proxy_id,
+            **self.metadata,
         }
 
 
@@ -126,6 +128,9 @@ class NetStore:
             self._conn.execute("ALTER TABLE net_http ADD COLUMN egress_proxy_id VARCHAR")
         except Exception:
             pass
+        columns = {row[1] for row in self._conn.execute("PRAGMA table_info('net_http')").fetchall()}
+        if 'metadata' not in columns:
+            self._conn.execute("ALTER TABLE net_http ADD COLUMN metadata VARCHAR")
 
     def insert(self, event: HttpEvent) -> None:
         with self._lock:
@@ -136,8 +141,8 @@ class NetStore:
             INSERT INTO net_http (
               id, run_id, ts, host, method, url, status, summary,
               req_headers, req_body, resp_headers, resp_body, evidence_id, failed,
-              egress_proxy_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              egress_proxy_id, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 event.id,
@@ -155,6 +160,7 @@ class NetStore:
                 event.evidence_id,
                 event.failed,
                 event.egress_proxy_id,
+                dumps(event.metadata),
             ],
         )
 
@@ -165,7 +171,7 @@ class NetStore:
             row = self._conn.execute(
                 "SELECT id, run_id, ts, host, method, url, status, summary, "
                 "req_headers, req_body, resp_headers, resp_body, evidence_id, failed, "
-                "egress_proxy_id FROM net_http WHERE id = ?",
+                "egress_proxy_id, metadata FROM net_http WHERE id = ?",
                 [event_id],
             ).fetchone()
             if row is None:
@@ -199,7 +205,7 @@ class NetStore:
             sql = (
                 "SELECT id, run_id, ts, host, method, url, status, summary, "
                 "req_headers, req_body, resp_headers, resp_body, evidence_id, failed, "
-                "egress_proxy_id FROM net_http WHERE {} ORDER BY ts ASC LIMIT ?"
+                "egress_proxy_id, metadata FROM net_http WHERE {} ORDER BY ts ASC LIMIT ?"
             ).format(" AND ".join(clauses))
             params.append(limit)
             rows = self._conn.execute(sql, params).fetchall()
@@ -267,6 +273,7 @@ class NetStore:
             evidence_id=row[12],
             failed=bool(row[13]),
             egress_proxy_id=row[14] if len(row) > 14 else None,
+            metadata=json.loads(row[15]) if len(row) > 15 and row[15] else {},
         )
 
 

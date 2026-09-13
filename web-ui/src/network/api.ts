@@ -157,6 +157,7 @@ export async function fetchPocTemplate(templateId: string): Promise<PocTemplateD
 }
 
 export async function runPocScan(body: {
+  proxy_mode: 'direct' | 'fallback' | 'pool'
   target: string
   templates: string[]
   timeout: number
