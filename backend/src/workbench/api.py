@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 import httpx
 
 from .approval import ApprovalManager
+from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard
 from .config import Settings, load_settings
 from .control import ControlPlane, new_id, utcnow
 from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
@@ -333,6 +334,19 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "approvals": st.approvals.status(),
             "current_run_id": current_run_id,
         }
+
+    @app.get("/blackboards")
+    def blackboards() -> Dict[str, Any]:
+        return list_blackboards(state().settings.dsh_home)
+
+    @app.get("/blackboards/{workspace_id}/{owner_id}")
+    def blackboard_file(workspace_id: str, owner_id: str) -> Dict[str, Any]:
+        try:
+            return read_blackboard(state().settings.dsh_home, workspace_id, owner_id)
+        except BlackboardBadRequest as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except BlackboardNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.get("/approvals")
     def approvals() -> Dict[str, Any]:

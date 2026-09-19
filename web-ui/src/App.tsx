@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApprovals } from './approval/api'
 import { ApprovalPage } from './approval/ApprovalPage'
 import type { ApprovalPayload } from './approval/types'
+import { BlackboardPage } from './blackboard/BlackboardPage'
 import { DSH_URL_EVENT, DEFAULT_DSH_URL, persistDshUrl, readStoredDshUrl } from './dshUrl'
 import { NetworkTimeline } from './network/NetworkTimeline'
 import { PocScan } from './network/PocScan'
@@ -9,6 +10,7 @@ import { ProxyPool } from './network/ProxyPool'
 
 export type RouteId =
   | 'agent'
+  | 'blackboard'
   | 'approval'
   | 'evidence'
   | 'network'
@@ -18,6 +20,7 @@ export type RouteId =
 
 const NAV: { id: RouteId; label: string; hint: string }[] = [
   { id: 'agent', label: 'Agent 工作台', hint: 'DeepSeek Harness' },
+  { id: 'blackboard', label: '画板展示', hint: '会话 fact-intent 图' },
   { id: 'approval', label: '审批', hint: '高危动作确认' },
   { id: 'evidence', label: '证据', hint: '会话取证浏览' },
   { id: 'network', label: '网络时间线', hint: '捕获 / 拦截 / 重放' },
@@ -170,6 +173,7 @@ export function App() {
           )}
         </section>
 
+        {route === 'blackboard' && <BlackboardPage />}
         {route === 'approval' && (
           <ApprovalPage
             payload={approvals}
@@ -276,6 +280,13 @@ function icon(id: RouteId) {
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
           <rect x="4" y="5" width="16" height="14" rx="2" />
           <path d="M8 9h8M8 13h5" />
+        </svg>
+      )
+    case 'blackboard':
+      return (
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+          <path d="M7 9.5h10M7 13h6" />
         </svg>
       )
     case 'approval':

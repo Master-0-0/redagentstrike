@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import platform
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +13,13 @@ def _default_data_dir() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     return Path(__file__).resolve().parents[2] / "data"
+
+
+def _default_dsh_home() -> Path:
+    override = os.environ.get("WORKBENCH_DSH_HOME") or os.environ.get("DSH_HOME")
+    if override and override.strip():
+        return Path(override).expanduser().resolve()
+    return Path.home() / ".dsh"
 
 
 @dataclass(frozen=True)
@@ -30,6 +37,7 @@ class Settings:
     dsh_host: str = "127.0.0.1"
     dsh_port: int = 3081
     manage_dsh: bool = False
+    dsh_home: Path = field(default_factory=_default_dsh_home)
 
     @property
     def control_db(self) -> Path:
@@ -117,6 +125,7 @@ def load_settings() -> Settings:
         dsh_host=os.environ.get("WORKBENCH_DSH_HOST", "127.0.0.1"),
         dsh_port=int(os.environ.get("WORKBENCH_DSH_PORT", "3081")),
         manage_dsh=manage_dsh,
+        dsh_home=_default_dsh_home(),
         body_limit=int(os.environ.get("WORKBENCH_BODY_LIMIT", "1000000")),
         header_value_limit=int(os.environ.get("WORKBENCH_HEADER_VALUE_LIMIT", "0")),
     )
