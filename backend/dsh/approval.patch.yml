@@ -1,0 +1,9 @@
+- id: ui-approval
+  disabled: true
+
+- insert:
+    - id: workbench-approval-hooks
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        configPath: !!js process.env.WORKBENCH_DSH_HOOK_CONFIG
+        pluginRoot: !!js process.env.WORKBENCH_DSH_HOOK_ROOT

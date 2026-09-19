@@ -48,6 +48,26 @@ class Settings:
         return Path(__file__).resolve().parents[2] / "pocs"
 
     @property
+    def approval_rules_path(self) -> Path:
+        return self.data_dir / "approval-rules.json"
+
+    @property
+    def dsh_approval_patch(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "dsh" / "approval.patch.yml"
+
+    @property
+    def dsh_hook_config(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "dsh" / "hooks.json"
+
+    @property
+    def dsh_hook_root(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "dsh"
+
+    @property
+    def hook_api_url(self) -> str:
+        return "http://{}:{}".format(self.api_host, self.api_port)
+
+    @property
     def combined_ca(self) -> Path:
         return self.data_dir / "combined-ca.pem"
 

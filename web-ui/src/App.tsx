@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchApprovals } from './approval/api'
+import { ApprovalPage } from './approval/ApprovalPage'
+import type { ApprovalPayload } from './approval/types'
 import { DSH_URL_EVENT, DEFAULT_DSH_URL, persistDshUrl, readStoredDshUrl } from './dshUrl'
 import { NetworkTimeline } from './network/NetworkTimeline'
 import { PocScan } from './network/PocScan'
@@ -28,6 +31,10 @@ export function App() {
   const [dshUrl, setDshUrl] = useState(readStoredDshUrl)
   const [dshLive, setDshLive] = useState<'unknown' | 'up' | 'down'>('unknown')
   const [frameReady, setFrameReady] = useState(false)
+  const [approvals, setApprovals] = useState<ApprovalPayload | null>(null)
+  const [approvalLoading, setApprovalLoading] = useState(true)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
+  const approvalRequest = useRef<Promise<void> | null>(null)
 
   const iframeSrc = useMemo(() => normalizeDshUrl(dshUrl), [dshUrl])
 
@@ -53,6 +60,30 @@ export function App() {
     const timer = window.setInterval(() => { void probe() }, 8_000)
     return () => window.clearInterval(timer)
   }, [probe])
+
+  const refreshApprovals = useCallback((): Promise<void> => {
+    if (approvalRequest.current) return approvalRequest.current
+    const request = fetchApprovals()
+      .then((next) => {
+        setApprovals(next)
+        setApprovalError(null)
+      })
+      .catch((error: unknown) => {
+        setApprovalError(error instanceof Error && error.message ? error.message : '读取审批队列失败')
+      })
+      .finally(() => {
+        setApprovalLoading(false)
+        if (approvalRequest.current === request) approvalRequest.current = null
+      })
+    approvalRequest.current = request
+    return request
+  }, [])
+
+  useEffect(() => {
+    void refreshApprovals()
+    const timer = window.setInterval(() => { void refreshApprovals() }, 1_000)
+    return () => window.clearInterval(timer)
+  }, [refreshApprovals])
 
   useEffect(() => {
     const onUrl = (event: Event) => {
@@ -96,6 +127,11 @@ export function App() {
                 <span className="nav-label">{item.label}</span>
                 <span className="nav-hint">{item.hint}</span>
               </span>
+              {item.id === 'approval' && (approvals?.pending_count ?? 0) > 0 && (
+                <span className="nav-count" aria-label={`${approvals?.pending_count} 项等待审批`}>
+                  {(approvals?.pending_count ?? 0) > 99 ? '99+' : approvals?.pending_count}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -135,7 +171,12 @@ export function App() {
         </section>
 
         {route === 'approval' && (
-          <Placeholder title="审批" detail="高危工具调用会在这里打断等待确认。v1 先把 Agent 工作台跑通。" />
+          <ApprovalPage
+            payload={approvals}
+            loading={approvalLoading}
+            error={approvalError}
+            onRefresh={refreshApprovals}
+          />
         )}
         {route === 'evidence' && (
           <Placeholder title="证据" detail="会话产物、截图与工具输出会在这里按 Run 归档浏览。" />

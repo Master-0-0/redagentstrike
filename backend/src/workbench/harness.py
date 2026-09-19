@@ -87,6 +87,9 @@ class HarnessManager:
         cmd = _dsh_cmd(self.settings)
         env = proxy_env(self.settings) if proxied else direct_env(self.settings)
         env["PATH"] = os.environ.get("PATH", "")
+        env["WORKBENCH_DSH_HOOK_CONFIG"] = str(self.settings.dsh_hook_config)
+        env["WORKBENCH_DSH_HOOK_ROOT"] = str(self.settings.dsh_hook_root)
+        env["WORKBENCH_HOOK_URL"] = self.settings.hook_api_url
         log_path = self.settings.data_dir / "dsh-web.log"
         self.settings.data_dir.mkdir(parents=True, exist_ok=True)
         self._close_log()
@@ -175,6 +178,8 @@ def _dsh_cmd(settings: Settings) -> List[str]:
             "tsx/esm",
             "apps/cli/src/bin.ts",
             "web",
+            "--patch",
+            str(settings.dsh_approval_patch),
             "--no-open",
             "--host",
             settings.dsh_host,
@@ -183,7 +188,18 @@ def _dsh_cmd(settings: Settings) -> List[str]:
         ]
     pnpm = shutil.which("pnpm")
     if pnpm:
-        return [pnpm, "dsh", "web", "--no-open", "--host", settings.dsh_host, "--port", port]
+        return [
+            pnpm,
+            "dsh",
+            "web",
+            "--patch",
+            str(settings.dsh_approval_patch),
+            "--no-open",
+            "--host",
+            settings.dsh_host,
+            "--port",
+            port,
+        ]
     raise RuntimeError("dsh_runtime_missing")
 
 

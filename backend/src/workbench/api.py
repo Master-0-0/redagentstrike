@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import httpx
 
+from .approval import ApprovalManager
 from .config import Settings, load_settings
 from .control import ControlPlane, new_id, utcnow
 from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
@@ -117,6 +118,29 @@ class PocScanBody(BaseModel):
     proxy_mode: Literal['direct', 'fallback', 'pool'] = 'fallback'
 
 
+class ApprovalRuleBody(BaseModel):
+    id: str
+    label: str
+    kind: Literal["command", "regex"]
+    value: str
+    enabled: bool = True
+
+
+class ApprovalRulesBody(BaseModel):
+    rules: List[ApprovalRuleBody] = Field(default_factory=list)
+
+
+class ApprovalDecisionBody(BaseModel):
+    outcome: Literal["allowed-once", "rejected"]
+
+
+class HookCheckBody(BaseModel):
+    session_id: str = ""
+    tool_name: str = ""
+    tool_use_id: str = ""
+    tool_input: Dict[str, Any] = Field(default_factory=dict)
+
+
 class AppState:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -127,6 +151,7 @@ class AppState:
         self.holds = HoldBoard()
         self.replays = ReplayCache()
         self.harness = HarnessManager(settings)
+        self.approvals = ApprovalManager(settings, self.harness)
         self.pool = ProxyPool(settings.control_db)
         self.agent_lease: Optional[Lease] = None
         self.poc_recorder = PocRecorder(self)
@@ -196,9 +221,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         state = AppState(settings)
         app.state.wb = state
+        await state.approvals.start()
         try:
             yield
         finally:
+            await state.approvals.close()
             state.close()
 
     app = FastAPI(title="workbench", lifespan=lifespan)
@@ -303,8 +330,43 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "capture": st.mitm.status(),
             "intercept": st.holds.status(),
             "harness": st.harness.status(),
+            "approvals": st.approvals.status(),
             "current_run_id": current_run_id,
         }
+
+    @app.get("/approvals")
+    def approvals() -> Dict[str, Any]:
+        return state().approvals.snapshot()
+
+    @app.get("/approvals/rules")
+    def approval_rules() -> Dict[str, Any]:
+        return state().approvals.rules_snapshot()
+
+    @app.put("/approvals/rules")
+    def update_approval_rules(body: ApprovalRulesBody) -> Dict[str, Any]:
+        try:
+            return state().approvals.replace_rules(
+                [rule.model_dump() for rule in body.rules]
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/approvals/{event_id}/decision")
+    async def decide_approval(
+        event_id: str,
+        body: ApprovalDecisionBody,
+    ) -> Dict[str, Any]:
+        try:
+            found = await state().approvals.decide(event_id, body.outcome)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        if not found:
+            raise HTTPException(status_code=404, detail="approval not found")
+        return {"ok": True, "outcome": body.outcome}
+
+    @app.post("/internal/dsh/hook/check")
+    async def check_dsh_hook(body: HookCheckBody) -> Dict[str, Any]:
+        return await state().approvals.request_hook(body.model_dump())
 
     @app.get("/runs")
     def list_runs() -> Dict[str, Any]:
