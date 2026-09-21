@@ -12,3 +12,6 @@ backend/.pytest_cache/
 backend/*.egg-info/
 
 **/node_modules/
+
+# Local Vulhub lab clone; do not publish with this repo.
+vulhub-nacos-cve-2021-29441/

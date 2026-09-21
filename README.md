@@ -34,7 +34,6 @@ web-ui/                React 壳（Vite）
 deepseek-harness/      DeepSeek Harness 源码（git submodule）
 dsh-cairn-search/      Cairn 搜索：blackboard 工具 + 侧栏图 + cairn preset
 dsh-theme-hacker/      Harness Web 主题
-vulhub-nacos-cve-2021-29441/   可选本地 Nacos 靶场（CVE-2021-29441）
 .dsh/skills/proxy-pool/        Agent 换 IP 的 skill（启动 API 时复制到 ~/.dsh）
 ```
 
@@ -186,10 +185,13 @@ WORKBENCH_MANAGE_DSH=0 backend/.venv/bin/python -m workbench
 
 ### 可选：本地 Nacos 靶场
 
-仅用于你自己机器上的授权实验：
+仅用于你自己机器上的授权实验。本仓库不收录靶场文件，请自行从 [Vulhub](https://github.com/vulhub/vulhub) 拉取 `nacos/CVE-2021-29441`：
 
 ```sh
-cd vulhub-nacos-cve-2021-29441/nacos/CVE-2021-29441
+git clone --depth 1 --filter=blob:none --sparse https://github.com/vulhub/vulhub.git
+cd vulhub
+git sparse-checkout set nacos/CVE-2021-29441
+cd nacos/CVE-2021-29441
 docker compose up -d
 ```
 
@@ -220,4 +222,4 @@ cd dsh-cairn-search && npm test
 
 ## 许可与安全
 
-`deepseek-harness/` 与 `vulhub-nacos-cve-2021-29441/` 各有上游许可证。本工作台只应在授权范围内使用；不要对未授权系统扫描或利用。
+`deepseek-harness/` 有上游许可证。本工作台只应在授权范围内使用；不要对未授权系统扫描或利用。
