@@ -1,0 +1,2648 @@
+tags = [
+    # Vulnerability type
+    "Auth Bypass", "Backdoor", "Deserialization", "DoS", "Environment Injection", "Expression Injection", "File Upload", "File Deletion", "Hard Coding", "Info Disclosure", "Path Traversal", "Privilege Escalation", "RCE", "SQL Injection", "SSRF", "SSTI", "XXE", "XSS", "SSRF",
+    # Application type
+    "CMS", "Database", "Framework", "Message Queue", "Webserver", "LLM",
+    # Other
+    "Other",
+]
+
+[[environment]]
+name = "1Panel Control Panel PostAuth SQL Injection"
+cve = ["CVE-2024-39907"]
+app = "1panel"
+path = "1panel/CVE-2024-39907"
+dockerfile = {"vulhub/1panel:1.10.10" = "base/1panel/1.10.10"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "Apache ActiveMQ Deserialization"
+cve = ["CVE-2015-5254"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2015-5254"
+dockerfile = {"vulhub/activemq:5.11.1" = "base/activemq/5.11.1"}
+tags = ["Deserialization", "RCE", "Message Queue"]
+
+[[environment]]
+name = "Apache ActiveMQ Arbitrary File Write"
+cve = ["CVE-2016-3088"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2016-3088"
+dockerfile = {"vulhub/activemq:5.11.1-with-cron" = "base/activemq/5.11.1/with-cron"}
+tags = ["File Upload", "RCE", "Message Queue"]
+
+[[environment]]
+name = "Apache ActiveMQ Jolokia Authenticated Remote Code Execution"
+cve = ["CVE-2022-41678"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2022-41678"
+dockerfile = {"vulhub/activemq:5.17.3" = "base/activemq/5.17.3"}
+tags = ["RCE", "Message Queue"]
+
+[[environment]]
+name = "Apache ActiveMQ OpenWire Protocol Deserialization RCE"
+cve = ["CVE-2023-46604"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2023-46604"
+dockerfile = {"vulhub/activemq:5.17.3" = "base/activemq/5.17.3"}
+tags = ["RCE", "Deserialization", "Message Queue"]
+
+[[environment]]
+name = "Apache ActiveMQ Jolokia API Unauthorized Access"
+cve = ["CVE-2024-32114"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2024-32114"
+dockerfile = {"vulhub/activemq:6.1.1" = "base/activemq/6.1.1"}
+tags = ["Info Disclosure", "Message Queue"]
+
+[[environment]]
+name = "Apache ActiveMQ Jolokia Remote Code Execution"
+cve = ["CVE-2026-34197"]
+app = "Apache ActiveMQ"
+path = "activemq/CVE-2026-34197"
+dockerfile = {"vulhub/activemq:6.2.2" = "base/activemq/6.2.2"}
+tags = ["RCE", "Message Queue"]
+
+[[environment]]
+name = "Adminer Server-side Request Forgery on Error Page of Elasticsearch and ClickHouse"
+cve = ["CVE-2021-21311"]
+app = "Adminer"
+path = "adminer/CVE-2021-21311"
+dockerfile = {"vulhub/adminer:4.7.8" = "base/adminer/4.7.8"}
+tags = ["SSRF", "Database"]
+
+[[environment]]
+name = "Adminer Remote Arbitrary File Read"
+cve = ["CVE-2021-43008"]
+app = "Adminer"
+path = "adminer/CVE-2021-43008"
+dockerfile = {"vulhub/adminer:4.6.2" = "base/adminer/4.6.2"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Apache Airflow Command Injection"
+cve = ["CVE-2020-11978"]
+app = "Apache Airflow"
+path = "airflow/CVE-2020-11978"
+dockerfile = {"vulhub/airflow:1.10.10" = "base/airflow/1.10.10"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache Airflow Celery Message Middleware Command Execution"
+cve = ["CVE-2020-11981"]
+app = "Apache Airflow"
+path = "airflow/CVE-2020-11981"
+dockerfile = {"vulhub/airflow:1.10.10" = "base/airflow/1.10.10"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache Airflow Permission Bypass"
+cve = ["CVE-2020-17526"]
+app = "Apache Airflow"
+path = "airflow/CVE-2020-17526"
+dockerfile = {"vulhub/airflow:1.10.10" = "base/airflow/1.10.10"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "AJ-Report Authentication Bypass and Remote Code Execution"
+cve = []
+app = "AJ-Report"
+path = "aj-report/CNVD-2024-15077"
+dockerfile = {"vulhub/aj-report:1.4.0" = "base/aj-report/1.4.0"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Apache CXF Aegis DataBinding Server-Side Request Forgery"
+cve = ["CVE-2024-28752"]
+app = "Apache CXF"
+path = "apache-cxf/CVE-2024-28752"
+dockerfile = {"vulhub/apache-cxf:3.2.14" = "base/apache-cxf/3.2.14"}
+tags = ["SSRF"]
+
+[[environment]]
+name = "Apache Druid Embedded Javascript Remote Code Execution"
+cve = ["CVE-2021-25646"]
+app = "Apache Druid"
+path = "apache-druid/CVE-2021-25646"
+dockerfile = {"vulhub/apache-druid:0.20.0" = "base/apache-druid/0.20.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apereo CAS 4.1 Deserialization Command Execution"
+cve = []
+app = "Apereo CAS"
+path = "apereo-cas/4.1-rce"
+dockerfile = {"vulhub/apereo-cas:4.1.5" = "base/apereo-cas/4.1.5"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Apache APISIX Hardcoded API Token Leads to RCE"
+cve = ["CVE-2020-13945"]
+app = "Apache APISIX"
+path = "apisix/CVE-2020-13945"
+dockerfile = {"vulhub/apisix:2.11.0" = "base/apisix/2.11.0"}
+tags = ["RCE", "Hard Coding", "Webserver"]
+
+[[environment]]
+name = "Apache APISIX Dashboard API Permission Bypass to RCE"
+cve = ["CVE-2021-45232"]
+app = "Apache APISIX"
+path = "apisix/CVE-2021-45232"
+dockerfile = {"vulhub/apisix-dashboard:2.9.0" = "base/apisix-dashboard/2.9.0", "vulhub/apisix:2.9" = "base/apisix/2.9"}
+tags = ["RCE", "Auth Bypass", "Webserver"]
+
+[[environment]]
+name = "AppWeb Authentication Bypass"
+cve = ["CVE-2018-8715"]
+app = "AppWeb"
+path = "appweb/CVE-2018-8715"
+dockerfile = {"vulhub/appweb:7.0.1" = "base/appweb/7.0.1"}
+tags = ["Auth Bypass", "Webserver"]
+
+[[environment]]
+name = "Aria2 Arbitrary File Write"
+cve = []
+app = "Aria2"
+path = "aria2/rce"
+dockerfile = {"vulhub/aria2:1.18.8" = "base/aria2/1.18.8"}
+tags = ["File Upload", "RCE"]
+
+[[environment]]
+name = "Bash Shellshock Remote Command Injection"
+cve = ["CVE-2014-6271"]
+app = "Bash"
+path = "bash/CVE-2014-6271"
+dockerfile = {"vulhub/bash:4.3.0-with-httpd" = "base/bash/4.3.0/with-httpd"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Budibase Authentication Bypass via Webhook Query Parameter"
+cve = ["CVE-2026-31816"]
+app = "Budibase"
+path = "budibase/CVE-2026-31816"
+dockerfile = {"vulhub/budibase:3.31.4-apps" = "base/budibase/3.31.4-apps", "vulhub/budibase:3.31.4-proxy" = "base/budibase/3.31.4-proxy", "vulhub/budibase:3.31.4-worker" = "base/budibase/3.31.4-worker"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Cacti remote_agent.php Pre-Auth Command Injection"
+cve = ["CVE-2022-46169"]
+app = "Cacti"
+path = "cacti/CVE-2022-46169"
+dockerfile = {"vulhub/cacti:1.2.22" = "base/cacti/1.2.22"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Cacti graph_view.php SQL Injection Leads to RCE"
+cve = ["CVE-2023-39361", "CVE-2024-31459"]
+app = "Cacti"
+path = "cacti/CVE-2023-39361"
+dockerfile = {"vulhub/cacti:1.2.24" = "base/cacti/1.2.24"}
+tags = ["SQL Injection", "RCE"]
+
+[[environment]]
+name = "Cacti RRDTool Post-Auth Argument Injection Leads to RCE"
+cve = ["CVE-2025-24367"]
+app = "Cacti"
+path = "cacti/CVE-2025-24367"
+dockerfile = {"vulhub/cacti:1.2.28" = "base/cacti/1.2.28"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Celery <4.0 Redis Unauthorized Access and Pickle Deserialization"
+cve = []
+app = "Celery"
+path = "celery/celery3_redis_unauth"
+dockerfile = {"vulhub/celery:3.1.23" = "base/celery/3.1.23"}
+tags = ["Deserialization", "Auth Bypass"]
+
+[[environment]]
+name = "Chartbrew MongoDB Dataset Query Remote Code Execution"
+cve = ["CVE-2026-25887"]
+app = "Chartbrew"
+path = "chartbrew/CVE-2026-25887"
+dockerfile = {"vulhub/chartbrew:4.8.0" = "base/chartbrew/4.8.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "CGI Application Environment Variable Injection by HTTPoxy"
+cve = ["CVE-2016-5385"]
+app = "CGI"
+path = "cgi/CVE-2016-5385"
+dockerfile = {"vulhub/php:httpoxy" = "base/httpd/bad-http"}
+tags = ["Environment Injection"]
+
+[[environment]]
+name = "CMS Made Simple (CMSMS) < 2.2.10 Unauthenticated SQL Injection"
+cve = ["CVE-2019-9053"]
+app = "CMS Made Simple"
+path = "cmsms/CVE-2019-9053"
+dockerfile = {"vulhub/cmsms:2.2.9.1" = "base/cmsms/2.2.9.1"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "CMS Made Simple (CMSMS) Unauthenticated Remote Code Execution"
+cve = ["CVE-2019-9053", "CVE-2021-26120"]
+app = "CMS Made Simple"
+path = "cmsms/CVE-2021-26120"
+dockerfile = {"vulhub/cmsms:2.2.9.1" = "base/cmsms/2.2.9.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Adobe ColdFusion File Read"
+cve = ["CVE-2010-2861"]
+app = "Adobe ColdFusion"
+path = "coldfusion/CVE-2010-2861"
+dockerfile = {"vulhub/coldfusion:8.0.1" = "base/coldfusion/8.0.1"}
+tags = ["Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Adobe ColdFusion Deserialization"
+cve = ["CVE-2017-3066"]
+app = "Adobe ColdFusion"
+path = "coldfusion/CVE-2017-3066"
+dockerfile = {"vulhub/coldfusion:11u3" = "base/coldfusion/11u3"}
+tags = ["Deserialization", "RCE", "Webserver"]
+
+[[environment]]
+name = "Adobe ColdFusion Local File Inclusion Leads to RCE"
+cve = ["CVE-2023-26360"]
+app = "Adobe ColdFusion"
+path = "coldfusion/CVE-2023-26360"
+dockerfile = {"vulhub/coldfusion:2018.0.15" = "base/coldfusion/2018.0.15"}
+tags = ["RCE", "Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Adobe ColdFusion XML Deserialization Leads to RCE"
+cve = ["CVE-2023-29300"]
+app = "Adobe ColdFusion"
+path = "coldfusion/CVE-2023-29300"
+dockerfile = {"vulhub/coldfusion:2018.0.15" = "base/coldfusion/2018.0.15"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "ComfyUI-Manager Remote Code Execution"
+cve = ["CVE-2025-67303"]
+app = "ComfyUI"
+path = "comfyui/CVE-2025-67303"
+dockerfile = {"vulhub/comfyui:3.37-with-manager" = "base/comfyui/with-manager/3.37"}
+tags = ["RCE", "LLM"]
+
+[[environment]]
+name = "ComfyUI-Manager CRLF Injection in Configuration Handler"
+cve = ["CVE-2026-22777"]
+app = "ComfyUI"
+path = "comfyui/CVE-2026-22777"
+dockerfile = {"vulhub/comfyui:3.39.1-with-manager" = "base/comfyui/with-manager/3.39.1"}
+tags = ["RCE", "LLM"]
+
+[[environment]]
+name = "Atlassian Confluence Path Traversal Leads to RCE"
+cve = ["CVE-2019-3396"]
+app = "Confluence"
+path = "confluence/CVE-2019-3396"
+dockerfile = {"vulhub/confluence:6.10.2" = "base/confluence/6.10.2"}
+tags = ["RCE", "Path Traversal"]
+
+[[environment]]
+name = "Atlassian Confluence Webwork Pre-Auth OGNL Injection Leads to RCE"
+cve = ["CVE-2021-26084"]
+app = "Confluence"
+path = "confluence/CVE-2021-26084"
+dockerfile = {"vulhub/confluence:7.4.10" = "base/confluence/7.4.10"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "Atlassian Confluence Pre-Auth Remote Code Execution via OGNL Injection"
+cve = ["CVE-2022-26134"]
+app = "Confluence"
+path = "confluence/CVE-2022-26134"
+dockerfile = {"vulhub/confluence:7.13.6" = "base/confluence/7.13.6"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "Atlassian Confluence Access Control Broken by Attributes Overwrite"
+cve = ["CVE-2023-22515"]
+app = "Confluence"
+path = "confluence/CVE-2023-22515"
+dockerfile = {"vulhub/confluence:8.5.1" = "base/confluence/8.5.1"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Atlassian Confluence Pre-Auth Remote Code Execution via OGNL Injection"
+cve = ["CVE-2023-22527"]
+app = "Confluence"
+path = "confluence/CVE-2023-22527"
+dockerfile = {"vulhub/confluence:8.5.3" = "base/confluence/8.5.3"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "CouchDB Vertical Permission Bypass"
+cve = ["CVE-2017-12635"]
+app = "Apache CouchDB"
+path = "couchdb/CVE-2017-12635"
+dockerfile = {"vulhub/couchdb:2.1.0" = "base/couchdb/2.1.0"}
+tags = ["Auth Bypass", "Database"]
+
+[[environment]]
+name = "CouchDB Arbitrary Command Execution"
+cve = ["CVE-2017-12636"]
+app = "Apache CouchDB"
+path = "couchdb/CVE-2017-12636"
+dockerfile = {"vulhub/couchdb:1.6.0" = "base/couchdb/1.6.0"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "CouchDB Erlang Distributed Protocol Code Execution"
+cve = ["CVE-2022-24706"]
+app = "Apache CouchDB"
+path = "couchdb/CVE-2022-24706"
+dockerfile = {"vulhub/couchdb:3.2.1" = "base/couchdb/3.2.1"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "CraftCMS ConditionsController Pre-Auth Remote Code Execution"
+cve = ["CVE-2023-41892"]
+app = "CraftCMS"
+path = "craftcms/CVE-2023-41892"
+dockerfile = {"vulhub/craftcms:4.4.14" = "base/craftcms/4.4.14"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "CraftCMS register_argc_argv Leads to Remote Code Execution"
+cve = ["CVE-2024-56145"]
+app = "CraftCMS"
+path = "craftcms/CVE-2024-56145"
+dockerfile = {"vulhub/craftcms:5.5.1.1" = "base/craftcms/5.5.1.1"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "CraftCMS Yii Class Injection Remote Code Execution"
+cve = ["CVE-2025-32432"]
+app = "CraftCMS"
+path = "craftcms/CVE-2025-32432"
+dockerfile = {"vulhub/craftcms:5.6.16" = "base/craftcms/5.6.16"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "OpenPrinting Cups-Browsed Remote Code Execution via The FoomaticRIPCommandLine PPD parameter"
+cve = ["CVE-2024-47177"]
+app = "OpenPrinting Cups-Browsed"
+path = "cups-browsed/CVE-2024-47177"
+dockerfile = {"vulhub/cups-browsed:2.0.1" = "base/cups-browsed/2.0.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Discuz 7.x/6.x Remote Code Execution via Global Variable Override"
+cve = []
+app = "Discuz!"
+path = "discuz/wooyun-2010-080723"
+dockerfile = {"vulhub/discuz:7.2" = "base/discuzx/7.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Discuz!X <= 3.4 Arbitrary File Deletion"
+cve = []
+app = "Discuz!"
+path = "discuz/x3.4-arbitrary-file-deletion"
+dockerfile = {"vulhub/discuz:x3.4" = "base/discuzx/3.4-20170801"}
+tags = ["File Deletion"]
+
+[[environment]]
+name = "DataEase Authentication Bypass via Whitelist Path Traversal"
+cve = ["CVE-2024-56511"]
+app = "DataEase"
+path = "dataease/CVE-2024-56511"
+dockerfile = {"vulhub/dataease:2.10.3" = "base/dataease/2.10.3"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "DataEase H2 JDBC Remote Code Execution"
+cve = ["CVE-2025-32966"]
+app = "DataEase"
+path = "dataease/CVE-2025-32966"
+dockerfile = {"vulhub/dataease:2.10.7" = "base/dataease/2.10.7"}
+tags = ["RCE"]
+
+[[environment]]
+name = "DataEase JWT Authentication Bypass"
+cve = ["CVE-2025-49001"]
+app = "DataEase"
+path = "dataease/CVE-2025-49001"
+dockerfile = {"vulhub/dataease:2.10.7" = "base/dataease/2.10.7"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Django 500 Debug Page Cross-Site Scripting (XSS)"
+cve = ["CVE-2017-12794"]
+app = "Django"
+path = "django/CVE-2017-12794"
+dockerfile = {"vulhub/django:1.11.4" = "base/django/1.11.4"}
+tags = ["XSS", "Framework"]
+
+[[environment]]
+name = "Django < 2.0.8 Open Redirect in CommonMiddleware"
+cve = ["CVE-2018-14574"]
+app = "Django"
+path = "django/CVE-2018-14574"
+dockerfile = {"vulhub/django:2.0.7" = "base/django/2.0.7"}
+tags = ["Framework"]
+
+[[environment]]
+name = "Django JSONField/HStoreField SQL Injection"
+cve = ["CVE-2019-14234"]
+app = "Django"
+path = "django/CVE-2019-14234"
+dockerfile = {"vulhub/django:2.2.3" = "base/django/2.2.3"}
+tags = ["SQL Injection", "Framework"]
+
+[[environment]]
+name = "Django GIS functions and aggregates on Oracle SQL Injection"
+cve = ["CVE-2020-9402"]
+app = "Django"
+path = "django/CVE-2020-9402"
+dockerfile = {"vulhub/django:3.0.3" = "base/django/3.0.3", "vulhub/oracle:12c-ee" = "base/oracle/12c-ee"}
+tags = ["SQL Injection", "Framework"]
+
+[[environment]]
+name = "Django QuerySet.order_by() SQL Injection"
+cve = ["CVE-2021-35042"]
+app = "Django"
+path = "django/CVE-2021-35042"
+dockerfile = {"vulhub/django:3.2.4" = "base/django/3.2.4"}
+tags = ["SQL Injection", "Framework"]
+
+[[environment]]
+name = "Django Trunc(kind) and Extract(lookup_name) SQL Injection"
+cve = ["CVE-2022-34265"]
+app = "Django"
+path = "django/CVE-2022-34265"
+dockerfile = {"vulhub/django:4.0.5" = "base/django/4.0.5"}
+tags = ["SQL Injection", "Framework"]
+
+[[environment]]
+name = "DNS Domain Transfer"
+cve = []
+app = "DNS"
+path = "dns/dns-zone-transfer"
+dockerfile = {"vulhub/bind:9.10.3" = "base/bind/9.10.3"}
+tags = ["Other"]
+
+[[environment]]
+name = "Docker Remote API Unauthorized Access Leads to Remote Code Execution"
+cve = []
+app = "Docker"
+path = "docker/unauthorized-rce"
+dockerfile = {"vulhub/docker:28.0.1" = "base/docker/28.0.1"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = 'Drupal < 7.32 "Drupalgeddon" SQL Injection'
+cve = ["CVE-2014-3704"]
+app = "Drupal"
+path = "drupal/CVE-2014-3704"
+dockerfile = {"vulhub/drupal:7.31" = "base/drupal/7.31"}
+tags = ["SQL Injection", "CMS"]
+
+[[environment]]
+name = "Drupal Core 8 PECL YAML Deserialization Remote Code Execution"
+cve = ["CVE-2017-6920"]
+app = "Drupal"
+path = "drupal/CVE-2017-6920"
+dockerfile = {"vulhub/drupal:8.3.0" = "base/drupal/8.3.0"}
+tags = ["RCE", "Deserialization", "CMS"]
+
+[[environment]]
+name = "Drupal Drupalgeddon 2 Unauthenticated Remote Code Execution"
+cve = ["CVE-2018-7600"]
+app = "Drupal"
+path = "drupal/CVE-2018-7600"
+dockerfile = {"vulhub/drupal:8.5.0" = "base/drupal/8.5.0"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "Drupal Drupalgeddon 3 Authenticated Remote Code Execution"
+cve = ["CVE-2018-7602"]
+app = "Drupal"
+path = "drupal/CVE-2018-7602"
+dockerfile = {"vulhub/drupal:7.57" = "base/drupal/7.57"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "Drupal Remote Code Execution by phar deserialization"
+cve = ["CVE-2019-6339"]
+app = "Drupal"
+path = "drupal/CVE-2019-6339"
+dockerfile = {"vulhub/drupal:8.5.0" = "base/drupal/8.5.0"}
+tags = ["RCE", "Deserialization", "CMS"]
+
+[[environment]]
+name = "Drupal Cross-Site Scripting by File Upload"
+cve = ["CVE-2019-6341"]
+app = "Drupal"
+path = "drupal/CVE-2019-6341"
+dockerfile = {"vulhub/drupal:8.5.0" = "base/drupal/8.5.0"}
+tags = ["XSS", "File Upload", "CMS"]
+
+[[environment]]
+name = "Apache Dubbo Java Deserialization"
+cve = ["CVE-2019-17564"]
+app = "Apache Dubbo"
+path = "dubbo/CVE-2019-17564"
+dockerfile = {"vulhub/dubbo:2.7.3" = "base/dubbo/2.7.3"}
+tags = ["Deserialization", "RCE"]
+
+[[environment]]
+name = "ECShop 4.x collection_list SQL Injection"
+cve = []
+app = "ECshop"
+path = "ecshop/collection_list-sqli"
+dockerfile = {"vulhub/ecshop:4.0.6" = "base/ecshop/4.0.6"}
+tags = ["SQL Injection", "CMS"]
+
+[[environment]]
+name = "ECShop 2.x/3.x SQL Injection/Arbitrary Code Execution"
+cve = []
+app = "ECshop"
+path = "ecshop/xianzhi-2017-02-82239600"
+dockerfile = {"vulhub/ecshop:2.7.3" = "base/ecshop/2.7.3", "vulhub/ecshop:3.6.0" = "base/ecshop/3.6.0"}
+tags = ["SQL Injection", "RCE", "CMS"]
+
+[[environment]]
+name = "ElasticSearch Remote Code Execution"
+cve = ["CVE-2014-3120"]
+app = "ElasticSearch"
+path = "elasticsearch/CVE-2014-3120"
+dockerfile = {"vulhub/elasticsearch:1.1.1" = "base/elasticsearch/1.1.1"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "ElasticSearch Groovy Sandbox Bypass and Remote Code Execution"
+cve = ["CVE-2015-1427"]
+app = "ElasticSearch"
+path = "elasticsearch/CVE-2015-1427"
+dockerfile = {"vulhub/elasticsearch:1.4.2" = "base/elasticsearch/1.4.2"}
+tags = ["RCE", "Expression Injection", "Database"]
+
+[[environment]]
+name = "ElasticSearch Plug-in Directory Traversal"
+cve = ["CVE-2015-3337"]
+app = "ElasticSearch"
+path = "elasticsearch/CVE-2015-3337"
+dockerfile = {"vulhub/elasticsearch:1.4.4" = "base/elasticsearch/1.4.4"}
+tags = ["Path Traversal", "Database"]
+
+[[environment]]
+name = "ElasticSearch Snapshot and Restore Directory Traversal"
+cve = ["CVE-2015-5531"]
+app = "ElasticSearch"
+path = "elasticsearch/CVE-2015-5531"
+dockerfile = {"vulhub/elasticsearch:1.6.0" = "base/elasticsearch/1.6.0"}
+tags = ["Path Traversal", "Database"]
+
+[[environment]]
+name = "ElasticSearch Arbitrary File Upload"
+cve = []
+app = "ElasticSearch"
+path = "elasticsearch/WooYun-2015-110216"
+dockerfile = {"vulhub/elasticsearch:1.5.1-with-tomcat" = "base/elasticsearch/1.5.1/with-tomcat"}
+tags = ["File Upload", "Database"]
+
+[[environment]]
+name = "Electron Remote Command Execution"
+cve = ["CVE-2018-1000006"]
+app = "Electron"
+path = "electron/CVE-2018-1000006"
+dockerfile = {"vulhub/electron:wine" = "base/electron/wine"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Electron WebPreferences Remote Command Execution"
+cve = ["CVE-2018-15685"]
+app = "Electron"
+path = "electron/CVE-2018-15685"
+dockerfile = {"vulhub/electron:wine" = "base/electron/wine"}
+tags = ["RCE"]
+
+[[environment]]
+name = "elFinder ZIP Parameter and Arbitrary Command Injection"
+cve = ["CVE-2021-32682"]
+app = "elFinder"
+path = "elfinder/CVE-2021-32682"
+dockerfile = {"vulhub/elfinder:2.1.58" = "base/elfinder/2.1.58"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Unauthenticated Remote Code Execution in Erlang/OTP SSH"
+cve = ["CVE-2025-32433"]
+app = "Erlang/OTP SSH"
+path = "erlang/CVE-2025-32433"
+dockerfile = {"vulhub/erlang:27.3.2-with-ssh" = "base/erlang/with-ssh/27.3.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Fastjson 1.2.24 Deserialization Remote Command Execution"
+cve = ["CVE-2017-18349"]
+app = "Fastjson"
+path = "fastjson/1.2.24-rce"
+dockerfile = {"vulhub/fastjson:1.2.24" = "base/fastjson/1.2.24"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Fastjson 1.2.47 Deserialization Remote Command Execution"
+cve = []
+app = "Fastjson"
+path = "fastjson/1.2.47-rce"
+dockerfile = {"vulhub/fastjson:1.2.45" = "base/fastjson/1.2.45"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Fastjson 1.2.83 Deserialization Remote Command Execution via jar Protocol"
+cve = []
+app = "Fastjson"
+path = "fastjson/1.2.83-rce"
+dockerfile = {"vulhub/fastjson:1.2.83" = "base/fastjson/1.2.83"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "FFmpeg Arbitrary File Read and SSRF"
+cve = ["CVE-2016-1897", "CVE-2016-1898"]
+app = "FFmpeg"
+path = "ffmpeg/CVE-2016-1897"
+dockerfile = {"vulhub/ffmpeg:2.8.4-with-php" = "base/ffmpeg/2.8.4-php"}
+tags = ["Path Traversal", "SSRF"]
+
+[[environment]]
+name = "FFmpeg AVI Arbitrary File Read"
+cve = ["CVE-2017-9993"]
+app = "FFmpeg"
+path = "ffmpeg/CVE-2017-9993"
+dockerfile = {"vulhub/ffmpeg:3.2.4-with-php" = "base/ffmpeg/3.2.4-php"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Flask (Jinja2) Server-Side Template Injection"
+cve = []
+app = "Jinja2"
+path = "flask/ssti"
+dockerfile = {"vulhub/flask:1.1.1" = "base/flask/1.1.1"}
+tags = ["SSTI", "RCE", "Framework"]
+
+[[environment]]
+name = "Apache Flink Upload Path Traversal"
+cve = ["CVE-2020-17518"]
+app = "Apache Flink"
+path = "flink/CVE-2020-17518"
+dockerfile = {"vulhub/flink:1.11.2" = "base/flink/1.11.2"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Apache Flink `jobmanager/logs` Path Traversal"
+cve = ["CVE-2020-17519"]
+app = "Apache Flink"
+path = "flink/CVE-2020-17519"
+dockerfile = {"vulhub/flink:1.11.2" = "base/flink/1.11.2"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "GeoServer Unauthenticated Server-Side Request Forgery"
+cve = ["CVE-2021-40822"]
+app = "GeoServer"
+path = "geoserver/CVE-2021-40822"
+dockerfile = {"vulhub/geoserver:2.19.1" = "base/geoserver/2.19.1"}
+tags = ["SSRF"]
+
+[[environment]]
+name = "GeoServer Remote Code Injection caused by JAI-EXT"
+cve = ["CVE-2022-24816", "CVE-2023-35042"]
+app = "GeoServer"
+path = "geoserver/CVE-2022-24816"
+dockerfile = {"vulhub/geoserver:2.17.2" = "base/geoserver/2.17.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "GeoServer OGC Filter SQL Injection"
+cve = ["CVE-2023-25157"]
+app = "GeoServer"
+path = "geoserver/CVE-2023-25157"
+dockerfile = {"vulhub/geoserver:2.22.1" = "base/geoserver/2.22.1"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "GeoServer Unauthenticated Remote Code Execution in Evaluating Property Name Expressions"
+cve = ["CVE-2024-36401"]
+app = "GeoServer"
+path = "geoserver/CVE-2024-36401"
+dockerfile = {"vulhub/geoserver:2.23.2" = "base/geoserver/2.23.2"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "GhostScript Sandbox Bypass Command Execution"
+cve = ["CVE-2018-16509"]
+app = "Ghostscript"
+path = "ghostscript/CVE-2018-16509"
+dockerfile = {"vulhub/imagemagick:7.0.8-10-php" = "base/imagemagick/7.0.8-10/php"}
+tags = ["RCE"]
+
+[[environment]]
+name = "GhostScript Sandbox Bypass Command Execution"
+cve = ["CVE-2018-19475"]
+app = "Ghostscript"
+path = "ghostscript/CVE-2018-19475"
+dockerfile = {"vulhub/imagemagick:7.0.8-20-php" = "base/imagemagick/7.0.8-20/php"}
+tags = ["RCE"]
+
+[[environment]]
+name = "GhostScript Sandbox Bypass Command Execution"
+cve = ["CVE-2019-6116"]
+app = "Ghostscript"
+path = "ghostscript/CVE-2019-6116"
+dockerfile = {"vulhub/imagemagick:7.0.8-27-php" = "base/imagemagick/7.0.8-27/php"}
+tags = ["RCE"]
+
+[[environment]]
+name = "GIT-SHELL Sandbox Bypass Leads to RCE"
+cve = ["CVE-2017-8386"]
+app = "Git"
+path = "git/CVE-2017-8386"
+dockerfile = {"vulhub/git:2.12.2-with-openssh" = "base/git/2.12.2/with-openssh"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Gitea 1.4.0 Directory Traversal Leading to Remote Command Execution"
+cve = []
+app = "Gitea"
+path = "gitea/1.4-rce"
+dockerfile = {"vulhub/gitea:1.4.0" = "base/gitea/1.4.0"}
+tags = ["RCE", "Path Traversal"]
+
+[[environment]]
+name = "GitLab Arbitrary File Read"
+cve = ["CVE-2016-9086"]
+app = "GitLab"
+path = "gitlab/CVE-2016-9086"
+dockerfile = {"vulhub/gitlab:8.13.1" = "base/gitlab/8.13.1"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "GitLab Remote Command Execution"
+cve = ["CVE-2021-22205"]
+app = "GitLab"
+path = "gitlab/CVE-2021-22205"
+dockerfile = {"vulhub/gitlab:13.10.1" = "base/gitlab/13.10.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "gitlist 0.6.0 Remote Command Execution"
+cve = ["CVE-2018-1000533"]
+app = "GitList"
+path = "gitlist/CVE-2018-1000533"
+dockerfile = {"vulhub/gitlist:0.6.0" = "base/gitlist/0.6.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "GlassFish 4.1.0 Arbitrary File Read"
+cve = ["CVE-2017-1000028"]
+app = "GlassFish"
+path = "glassfish/CVE-2017-1000028"
+dockerfile = {"vulhub/glassfish:4.1" = "base/glassfish/4.1"}
+tags = ["Path Traversal", "Webserver"]
+
+[[environment]]
+name = "GoAhead Web Server Environment Variables Injection and `LD_PRELOAD` Remote Code Execution"
+cve = ["CVE-2017-17562"]
+app = "GoAhead"
+path = "goahead/CVE-2017-17562"
+dockerfile = {"vulhub/goahead:3.6.4" = "base/goahead/3.6.4"}
+tags = ["RCE", "Environment Injection"]
+
+[[environment]]
+name = "GoAhead Web Server Environment Variables Injection and `LD_PRELOAD` Remote Code Execution"
+cve = ["CVE-2021-42342"]
+app = "GoAhead"
+path = "goahead/CVE-2021-42342"
+dockerfile = {"vulhub/goahead:5.1.4" = "base/goahead/5.1.4"}
+tags = ["RCE", "Environment Injection"]
+
+[[environment]]
+name = "Gogs Session Overwrite and Arbitrary User Forge"
+cve = ["CVE-2018-18925"]
+app = "Gogs"
+path = "gogs/CVE-2018-18925"
+dockerfile = {"vulhub/gogs:0.11.66" = "base/gogs/0.11.66"}
+tags = ["Auth Bypass", "Path Traversal"]
+
+[[environment]]
+name = "Gradio File Path Traversal"
+cve = ["CVE-2023-51449"]
+app = "Gradio"
+path = "gradio/CVE-2023-51449"
+dockerfile = {"vulhub/gradio:4.10.0" = "base/gradio/4.10.0"}
+tags = ["Path Traversal", "LLM"]
+
+[[environment]]
+name = "Gradio Arbitrary File Read"
+cve = ["CVE-2024-1561"]
+app = "Gradio"
+path = "gradio/CVE-2024-1561"
+dockerfile = {"vulhub/gradio:4.12.0" = "base/gradio/4.12.0"}
+tags = ["Path Traversal", "LLM"]
+
+[[environment]]
+name = "Grafana 8.x Plug-in Module Directory Traversal"
+cve = ["CVE-2021-43798"]
+app = "Grafana"
+path = "grafana/CVE-2021-43798"
+dockerfile = {"vulhub/grafana:8.2.6" = "base/grafana/8.2.6"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Grafana SQL Expressions Remote Code Execution"
+cve = ["CVE-2024-9264"]
+app = "Grafana"
+path = "grafana/CVE-2024-9264"
+dockerfile = {"vulhub/grafana:11.0.0" = "base/grafana/11.0.0"}
+tags = ["RCE", "SQL Injection"]
+
+[[environment]]
+name = "Grafana Management Background SSRF"
+cve = []
+app = "Grafana"
+path = "grafana/admin-ssrf"
+dockerfile = {"vulhub/grafana:8.5.4" = "base/grafana/8.5.4"}
+tags = ["SSRF"]
+
+[[environment]]
+name = "H2 Database Web Console Authentication Remote Code Execution"
+cve = ["CVE-2018-10054"]
+app = "Springboot H2 Database"
+path = "h2database/CVE-2018-10054"
+dockerfile = {"vulhub/spring-with-h2database:1.4.197" = "base/spring/with-h2database/1.4.197"}
+tags = ["Database", "RCE"]
+
+[[environment]]
+name = "H2 Database Web Console Pre-Auth JNDI Injection RCE"
+cve = ["CVE-2021-42392"]
+app = "Springboot H2 Database"
+path = "h2database/CVE-2021-42392"
+dockerfile = {"vulhub/spring-with-h2database:2.0.204" = "base/spring/with-h2database/2.0.204"}
+tags = ["Database", "RCE"]
+
+[[environment]]
+name = "H2 Database Web Console Pre-Auth JDBC Attack RCE"
+cve = ["CVE-2022-23221"]
+app = "Springboot H2 Database"
+path = "h2database/CVE-2022-23221"
+dockerfile = {"vulhub/spring-with-h2database:2.0.206" = "base/spring/with-h2database/2.0.206"}
+tags = ["Database", "RCE"]
+
+[[environment]]
+name = "Hadoop YARN ResourceManager Unauthorized Access"
+cve = []
+app = "Hadoop YARN"
+path = "hadoop/unauthorized-yarn"
+dockerfile = {"vulhub/hadoop:2.8.1" = "base/hadoop/2.8.1"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Apache HertzBeat SnakeYaml Deserialization Remote Code Execution"
+cve = ["CVE-2024-42323"]
+app = "Apache HertzBeat"
+path = "hertzbeat/CVE-2024-42323"
+dockerfile = {"vulhub/hertzbeat:1.4.4" = "base/hertzbeat/1.4.4"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Apache HTTPD Newline Parsing Vulnerability"
+cve = ["CVE-2017-15715"]
+app = "Apache HTTP Server"
+path = "httpd/CVE-2017-15715"
+dockerfile = {"vulhub/php:5.5-apache" = "base/php/5.5-apache"}
+tags = ["Webserver"]
+
+[[environment]]
+name = "Apache HTTP Server 2.4.48 mod_proxy SSRF"
+cve = ["CVE-2021-40438"]
+app = "Apache HTTP Server"
+path = "httpd/CVE-2021-40438"
+dockerfile = {"vulhub/httpd:2.4.43" = "base/httpd/2.4.43", "vulhub/tomcat:8.5.19" = "base/tomcat/tomcat8.5.19"}
+tags = ["SSRF", "Webserver"]
+
+[[environment]]
+name = "Apache HTTP Server 2.4.49 Path Traversal"
+cve = ["CVE-2021-41773"]
+app = "Apache HTTP Server"
+path = "httpd/CVE-2021-41773"
+dockerfile = {"vulhub/httpd:2.4.49" = "base/httpd/2.4.49"}
+tags = ["Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Apache HTTP Server 2.4.50 Path Traversal"
+cve = ["CVE-2021-42013"]
+app = "Apache HTTP Server"
+path = "httpd/CVE-2021-42013"
+dockerfile = {"vulhub/httpd:2.4.50" = "base/httpd/2.4.50"}
+tags = ["Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Apache HTTPD Multiple Extension Parsing Vulnerability"
+cve = []
+app = "Apache HTTP Server"
+path = "httpd/apache_parsing_vulnerability"
+dockerfile = {"vulhub/php:7.1.3-apache" = "base/php/7.1.3-apache"}
+tags = ["Webserver"]
+
+[[environment]]
+name = "Apache HTTP Server SSI Remote Command Execution"
+cve = []
+app = "Apache HTTP Server"
+path = "httpd/ssi-rce"
+dockerfile = {"vulhub/php:7.4.33-apache" = "base/php/7.4.33-apache"}
+tags = ["RCE", "Webserver"]
+
+[[environment]]
+name = "Apache HugeGraph Unauthenticated Remote Code Execution"
+cve = ["CVE-2024-27348"]
+app = "Apache HugeGraph"
+path = "hugegraph/CVE-2024-27348"
+dockerfile = {"vulhub/hugegraph:1.2.0" = "base/hugegraph/1.2.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache HugeGraph JWT Token Secret Hardcoding Leads to Authentication Bypass"
+cve = ["CVE-2024-43441"]
+app = "Apache HugeGraph"
+path = "hugegraph/CVE-2024-43441"
+dockerfile = {"vulhub/hugegraph:1.3.0" = "base/hugegraph/1.3.0"}
+tags = ["Auth Bypass", "Hard Coding"]
+
+[[environment]]
+name = "ImageMagick Imagetragick Command Injection"
+cve = ["CVE-2016-3714"]
+app = "ImageMagick"
+path = "imagemagick/CVE-2016-3714"
+dockerfile = {"vulhub/imagemagick:6.9.2-10-php" = "base/imagemagick/6.9.2-10/php"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ImageMagick PDF Password Location Command Injection"
+cve = ["CVE-2020-29599"]
+app = "ImageMagick"
+path = "imagemagick/CVE-2020-29599"
+dockerfile = {"vulhub/imagemagick:7.0.10-36" = "base/imagemagick/7.0.10-36"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ImageMagick Arbitrary File Read"
+cve = ["CVE-2022-44268"]
+app = "ImageMagick"
+path = "imagemagick/CVE-2022-44268"
+dockerfile = {"vulhub/imagemagick:7.1.0-49-php" = "base/imagemagick/7.1.0-49/php"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "GNU InetUtils telnetd Argument Injection Authentication Bypass"
+cve = ["CVE-2026-24061"]
+app = "GNU InetUtils"
+path = "inetutils/CVE-2026-24061"
+dockerfile = {"vulhub/inetutils:2.5" = "base/inetutils/2.5"}
+tags = ["Auth Bypass", "RCE", "Environment Injection"]
+
+[[environment]]
+name = "InfluxDB Empty JWT Secret Key Authentication Bypass"
+cve = ["CVE-2019-20933"]
+app = "InfluxDB"
+path = "influxdb/CVE-2019-20933"
+dockerfile = {"vulhub/influxdb:1.6.6" = "base/influxdb/1.6.6"}
+tags = ["Auth Bypass", "Hard Coding"]
+
+[[environment]]
+name = "Kubernetes Ingress-NGINX Unauthenticated Remote Code Execution"
+cve = ["CVE-2025-1974"]
+app = "ingress-nginx"
+path = "ingress-nginx/CVE-2025-1974"
+dockerfile = {"vulhub/ingress-nginx:1.9.5" = "base/ingress-nginx/1.9.5"}
+tags = ["RCE", "Webserver"]
+
+[[environment]]
+name = "Jackson-databind Deserialization Remote Command Execution"
+cve = ["CVE-2017-7525"]
+app = "Jackson-Databind"
+path = "jackson/CVE-2017-7525"
+dockerfile = {"vulhub/spring-with-jackson:2.8.8" = "base/spring/with-jackson/2.8.8"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Java RMI codebase Remote Code Execution"
+cve = []
+app = "Java RMI"
+path = "java/rmi-codebase"
+dockerfile = {"vulhub/j2ee:8u222" = "base/j2ee/8u222"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Java < JDK8u232_b09 RMI Registry Deserialization Remote Code Execution Bypass"
+cve = []
+app = "Java RMI"
+path = "java/rmi-registry-bind-deserialization-bypass"
+dockerfile = {"vulhub/j2ee:8u111" = "base/j2ee/8u111"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Java <= JDK 8u111 RMI Registry Deserialization Remote Code Execution"
+cve = []
+app = "Java RMI"
+path = "java/rmi-registry-bind-deserialization"
+dockerfile = {"vulhub/j2ee:8u131" = "base/j2ee/8u131"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "JBoss 5.x/6.x Deserialization Remote Code Execution"
+cve = ["CVE-2017-12149"]
+app = "JBoss"
+path = "jboss/CVE-2017-12149"
+dockerfile = {"vulhub/jboss:as-6.1.0" = "base/jboss/as-6.1.0"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "JBoss 4.x JBossMQ JMS Deserialization Remote Code Execution"
+cve = ["CVE-2017-7504"]
+app = "JBoss"
+path = "jboss/CVE-2017-7504"
+dockerfile = {"vulhub/jboss:as-4.0.5" = "base/jboss/as-4.0.5"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "JBoss JMXInvokerServlet Deserialization Remote Code Execution"
+cve = []
+app = "JBoss"
+path = "jboss/JMXInvokerServlet-deserialization"
+dockerfile = {"vulhub/jboss:as-6.1.0" = "base/jboss/as-6.1.0"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "Jenkins Remote Code Execution"
+cve = ["CVE-2017-1000353"]
+app = "Jenkins"
+path = "jenkins/CVE-2017-1000353"
+dockerfile = {"vulhub/jenkins:2.46.1" = "base/jenkins/2.46.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Jenkins Remote Command Execution"
+cve = ["CVE-2018-1000861"]
+app = "Jenkins"
+path = "jenkins/CVE-2018-1000861"
+dockerfile = {"vulhub/jenkins:2.138" = "base/jenkins/2.138"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Jenkins Arbitrary File Read Through the CLI"
+cve = ["CVE-2024-23897"]
+app = "Jenkins"
+path = "jenkins/CVE-2024-23897"
+dockerfile = {"vulhub/jenkins:2.441" = "base/jenkins/2.441"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Jetty WEB-INF Sensitive Information Disclosure"
+cve = ["CVE-2021-28164"]
+app = "Jetty"
+path = "jetty/CVE-2021-28164"
+dockerfile = {"vulhub/jetty:9.4.37" = "base/jetty/9.4.37"}
+tags = ["Info Disclosure", "Webserver"]
+
+[[environment]]
+name = "Jetty Common Servlets Component ConcatServlet Information Disclosure"
+cve = ["CVE-2021-28169"]
+app = "Jetty"
+path = "jetty/CVE-2021-28169"
+dockerfile = {"vulhub/jetty:9.4.40" = "base/jetty/9.4.40"}
+tags = ["Info Disclosure", "Webserver"]
+
+[[environment]]
+name = "Jetty WEB-INF Sensitive Information Disclosure"
+cve = ["CVE-2021-34429"]
+app = "Jetty"
+path = "jetty/CVE-2021-34429"
+dockerfile = {"vulhub/jetty:9.4.40" = "base/jetty/9.4.40"}
+tags = ["Info Disclosure", "Webserver"]
+
+[[environment]]
+name = "JeecgBoot JimuReport FreeMarker Server Side Template Injection RCE"
+cve = ["CVE-2023-4450"]
+app = "JimuReport"
+path = "jimureport/CVE-2023-4450"
+dockerfile = {"vulhub/jimureport:1.6.0" = "base/jimureport/1.6.0"}
+tags = ["RCE", "SSTI"]
+
+[[environment]]
+name = "Atlassian Jira Template Injection"
+cve = ["CVE-2019-11581"]
+app = "Jira"
+path = "jira/CVE-2019-11581"
+dockerfile = {"vulhub/jira:8.1.0" = "base/jira/8.1.0"}
+tags = ["SSTI", "RCE"]
+
+[[environment]]
+name = "Apache JMeter RMI Deserialization Remote Code Execution"
+cve = ["CVE-2018-1297"]
+app = "Apache Jmeter"
+path = "jmeter/CVE-2018-1297"
+dockerfile = {"vulhub/jmeter:3.3" = "base/jmeter/3.3"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Joomla 3.4.5 Deserialization"
+cve = ["CVE-2015-8562"]
+app = "Joomla"
+path = "joomla/CVE-2015-8562"
+dockerfile = {"vulhub/joomla:3.4.5" = "base/joomla/3.4.5"}
+tags = ["Deserialization", "RCE", "CMS"]
+
+[[environment]]
+name = "Joomla 3.7.0 SQL Injection"
+cve = ["CVE-2017-8917"]
+app = "Joomla"
+path = "joomla/CVE-2017-8917"
+dockerfile = {"vulhub/joomla:3.7.0" = "base/joomla/3.7.0"}
+tags = ["SQL Injection", "CMS"]
+
+[[environment]]
+name = "Joomla 4.2.7 Permission Bypass"
+cve = ["CVE-2023-23752"]
+app = "Joomla"
+path = "joomla/CVE-2023-23752"
+dockerfile = {"vulhub/joomla:4.2.7" = "base/joomla/4.2.7"}
+tags = ["Auth Bypass", "CMS"]
+
+[[environment]]
+name = "Jumpserver random seed leakage and account takeover"
+cve = ["CVE-2023-42820"]
+app = "Jumpserver"
+path = "jumpserver/CVE-2023-42820"
+dockerfile = {"vulhub/jumpserver:3.6.3" = "base/jumpserver/3.6.3"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Jupyter Notebook Unauthorized Access"
+cve = []
+app = "Jupyter"
+path = "jupyter/notebook-rce"
+dockerfile = {"vulhub/jupyter-notebook:5.2.2" = "base/jupyter-notebook/5.2.2"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Apache Kafka Clients JNDI Injection"
+cve = ["CVE-2023-25194"]
+app = "Apache Kafka"
+path = "kafka/CVE-2023-25194"
+dockerfile = {"vulhub/apache-druid:25.0.0" = "base/apache-druid/25.0.0"}
+tags = ["RCE", "Message Queue"]
+
+[[environment]]
+name = "Kibana Local File Inclusion"
+cve = ["CVE-2018-17246"]
+app = "Kibana"
+path = "kibana/CVE-2018-17246"
+dockerfile = {"vulhub/elasticsearch:5.6.16" = "base/elasticsearch/5.6.16", "vulhub/kibana:5.6.12" = "base/kibana/5.6.12"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Kibana Prototype Chain Pollution to Arbitrary Code Execution"
+cve = ["CVE-2019-7609"]
+app = "Kibana"
+path = "kibana/CVE-2019-7609"
+dockerfile = {"vulhub/elasticsearch:6.8.6" = "base/elasticsearch/6.8.6", "vulhub/kibana:6.5.4" = "base/kibana/6.5.4"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Kibana 7.6.2 upgrade-assistant-telemetry Prototype Pollution Leads to RCE"
+cve = ["CVE-2020-7012"]
+app = "Kibana"
+path = "kibana/CVE-2020-7012"
+dockerfile = {"vulhub/elasticsearch:7.6.2" = "base/elasticsearch/7.6.2", "vulhub/kibana:7.6.2" = "base/kibana/7.6.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "kkFileView ZipSlip Remote Code Execution"
+cve = []
+app = "kkFileView"
+path = "kkfileview/4.3-zipslip-rce"
+dockerfile = {"vulhub/kkfileview:4.3.0" = "base/kkfileview/4.3.0"}
+tags = ["RCE", "Path Traversal"]
+
+[[environment]]
+name = "Langflow `validate/code` API Pre-Auth Remote Code Execution"
+cve = ["CVE-2025-3248"]
+app = "Langflow"
+path = "langflow/CVE-2025-3248"
+dockerfile = {"vulhub/langflow:1.2.0" = "base/langflow/1.2.0"}
+tags = ["LLM", "RCE"]
+
+[[environment]]
+name = "Laravel Ignition 2.5.1 Remote Code Execution"
+cve = ["CVE-2021-3129"]
+app = "Laravel"
+path = "laravel/CVE-2021-3129"
+dockerfile = {"vulhub/laravel:8.4.2" = "base/laravel/8.4.2"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Librsvg XInclude Arbitrary file reading"
+cve = ["CVE-2023-38633"]
+app = "Librsvg"
+path = "librsvg/CVE-2023-38633"
+dockerfile = {"vulhub/librsvg:2.50.7-php" = "base/librsvg/2.50.7/php"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "libssh Server-side Authentication Bypass"
+cve = ["CVE-2018-10933"]
+app = "LibSSH"
+path = "libssh/CVE-2018-10933"
+dockerfile = {"vulhub/libssh:0.8.1" = "base/libssh/0.8.1"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Liferay Portal CE Deserialization Remote Code Execution"
+cve = ["CVE-2020-7961"]
+app = "Liferay Portal"
+path = "liferay-portal/CVE-2020-7961"
+dockerfile = {"vulhub/liferay-portal:7.2.0-ga1" = "base/liferay-portal/7.2.0-ga1"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Apache Linkis MySQL JDBC Datasource Deserialization Remote Code Execution"
+cve = ["CVE-2022-44645"]
+app = "Apache Linkis"
+path = "linkis/CVE-2022-44645"
+dockerfile = {"vulhub/linkis:1.3.0" = "base/linkis/1.3.0"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Livewire Component Property Hydration Remote Code Execution"
+cve = ["CVE-2025-54068"]
+app = "Laravel Livewire"
+path = "livewire/CVE-2025-54068"
+dockerfile = {"vulhub/livewire:3.6.3" = "base/livewire/3.6.3"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Apache Log4j TCP Server Deserialization Remote Code Execution"
+cve = ["CVE-2017-5645"]
+app = "Apache Log4j"
+path = "log4j/CVE-2017-5645"
+dockerfile = {"vulhub/log4j:2.8.1" = "base/log4j/2.8.1"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Apache Log4j2 lookup JNDI Injection"
+cve = ["CVE-2021-44228"]
+app = "Apache Log4j"
+path = "log4j/CVE-2021-44228"
+dockerfile = {"vulhub/solr:8.11.0" = "base/solr/8.11.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Magento 2.2 SQL Injection"
+cve = []
+app = "Magento"
+path = "magento/2.2-sqli"
+dockerfile = {"vulhub/magento:2.2.7" = "base/magento/2.2.7"}
+tags = ["SQL Injection", "CMS"]
+
+[[environment]]
+name = "Metabase Arbitrary File Read"
+cve = ["CVE-2021-41277"]
+app = "Metabase"
+path = "metabase/CVE-2021-41277"
+dockerfile = {"vulhub/metabase:0.40.4" = "base/metabase/0.40.4"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Metabase Pre-Auth JDBC Remote Code Execution"
+cve = ["CVE-2023-38646"]
+app = "Metabase"
+path = "metabase/CVE-2023-38646"
+dockerfile = {"vulhub/metabase:0.46.6" = "base/metabase/0.46.6"}
+tags = ["RCE"]
+
+[[environment]]
+name = "MeterSphere v1.15.4 Authenticated SQL Injection"
+cve = ["CVE-2021-45788"]
+app = "MeterSphere"
+path = "metersphere/CVE-2021-45788"
+dockerfile = {"vulhub/metersphere:1.15.4" = "base/metersphere/1.15.4"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "MeterSphere Plugin Endpoint Remote Code Execution"
+cve = []
+app = "MeterSphere"
+path = "metersphere/plugin-rce"
+dockerfile = {"vulhub/metersphere:1.16.3" = "base/metersphere/1.16.3"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ACME mini_httpd Arbitrary File Read"
+cve = ["CVE-2018-18778"]
+app = "mini_httpd"
+path = "mini_httpd/CVE-2018-18778"
+dockerfile = {"vulhub/mini_httpd:1.29" = "base/mini_httpd/1.29"}
+tags = ["Path Traversal", "Webserver"]
+
+[[environment]]
+name = "MinIO Cluster Mode Information Disclosure"
+cve = ["CVE-2023-28432"]
+app = "MinIO"
+path = "minio/CVE-2023-28432"
+dockerfile = {"vulhub/minio:2023-02-27T18-10-45Z" = "base/minio/2023-02-27T18-10-45Z"}
+tags = ["Info Disclosure"]
+
+[[environment]]
+name = "Mojarra JSF ViewState Deserialization"
+cve = []
+app = "Mojarra JSF"
+path = "mojarra/jsf-viewstate-deserialization"
+dockerfile = {"vulhub/mojarra:2.1.28" = "base/mojarra/2.1.28"}
+tags = ["Deserialization", "RCE"]
+
+[[environment]]
+name = "Mongo Express Remote Code Execution"
+cve = ["CVE-2019-10758"]
+app = "Mongo Express"
+path = "mongo-express/CVE-2019-10758"
+dockerfile = {"vulhub/mongo-express:0.53.0" = "base/mongo-express/0.53.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "MySQL Authentication Bypass"
+cve = ["CVE-2012-2122"]
+app = "MySQL"
+path = "mysql/CVE-2012-2122"
+dockerfile = {"vulhub/mysql:5.5.23" = "base/mysql/5.5.23"}
+tags = ["Auth Bypass", "Database"]
+
+[[environment]]
+name = "Nacos Authentication Bypass"
+cve = ["CVE-2021-29441"]
+app = "Nacos"
+path = "nacos/CVE-2021-29441"
+dockerfile = {"vulhub/nacos:1.4.0" = "base/nacos/1.4.0"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Alibaba Nacos Authentication Bypass and Remote Code Execution"
+cve = ["CVE-2021-29442"]
+app = "Nacos"
+path = "nacos/CVE-2021-29442"
+dockerfile = {"vulhub/nacos:1.4.0" = "base/nacos/1.4.0"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "n8n Content-Type Confusion Arbitrary File Read to RCE"
+cve = ["CVE-2026-21858"]
+app = "n8n"
+path = "n8n/CVE-2026-21858"
+dockerfile = {"vulhub/n8n:1.65.0" = "base/n8n/1.65.0"}
+tags = ["Path Traversal", "RCE"]
+
+[[environment]]
+name = "n8n Expression Sandbox Escape to RCE"
+cve = ["CVE-2025-68613"]
+app = "n8n"
+path = "n8n/CVE-2025-68613"
+dockerfile = {"vulhub/n8n:1.65.0" = "base/n8n/1.65.0"}
+tags = ["Expression Injection", "RCE"]
+
+[[environment]]
+name = "Neo4j Shell Server Deserialization"
+cve = ["CVE-2021-34371"]
+app = "Neo4j"
+path = "neo4j/CVE-2021-34371"
+dockerfile = {"vulhub/neo4j:3.4.18" = "base/neo4j/3.4.18"}
+tags = ["Deserialization", "RCE"]
+
+[[environment]]
+name = "Next.js Middleware Authorization Bypass"
+cve = ["CVE-2025-29927"]
+app = "Next.js"
+path = "next.js/CVE-2025-29927"
+dockerfile = {"vulhub/nextjs:15.2.2" = "base/next.js/15.2.2"}
+tags = ["Auth Bypass", "Framework"]
+
+[[environment]]
+name = "Nexus Repository Manager 3 Unauthenticated Remote Code Execution"
+cve = ["CVE-2019-7238"]
+app = "Nexus Repository Manager"
+path = "nexus/CVE-2019-7238"
+dockerfile = {"vulhub/nexus:3.14.0" = "base/nexus/3.14.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Nexus Repository Manager 3 Authenticated Remote Code Execution"
+cve = ["CVE-2020-10199"]
+app = "Nexus Repository Manager"
+path = "nexus/CVE-2020-10199"
+dockerfile = {"vulhub/nexus:3.21.1" = "base/nexus/3.21.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Nexus Repository Manager 3 Authenticated Remote Code Execution"
+cve = ["CVE-2020-10204"]
+app = "Nexus Repository Manager"
+path = "nexus/CVE-2020-10204"
+dockerfile = {"vulhub/nexus:3.21.1" = "base/nexus/3.21.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Nexus Repository Manager 3 Unauthenticated Path Traversal"
+cve = ["CVE-2024-4956"]
+app = "Nexus Repository Manager"
+path = "nexus/CVE-2024-4956"
+dockerfile = {"vulhub/nexus:3.68.0" = "base/nexus/3.68.0"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Nginx Filename Logic Vulnerability"
+cve = ["CVE-2013-4547"]
+app = "Nginx"
+path = "nginx/CVE-2013-4547"
+dockerfile = {"vulhub/nginx:1.4.2" = "base/nginx/1.4.2", "vulhub/php:5.6-fpm" = "base/php/5.6-fpm"}
+tags = ["Webserver"]
+
+[[environment]]
+name = "Nginx Cache Leak by Integer Overflow"
+cve = ["CVE-2017-7529"]
+app = "Nginx"
+path = "nginx/CVE-2017-7529"
+dockerfile = {"vulhub/nginx:1.13.2" = "base/nginx/1.13.2"}
+tags = ["Info Disclosure", "Webserver"]
+
+[[environment]]
+name = "Nginx Misconfiguration Vulnerabilities"
+cve = []
+app = "Nginx"
+path = "nginx/insecure-configuration"
+dockerfile = {"vulhub/nginx:1" = "base/nginx/1"}
+tags = ["Webserver"]
+
+[[environment]]
+name = "Nginx Parsing Vulnerability"
+cve = []
+app = "Nginx"
+path = "nginx/nginx_parsing_vulnerability"
+dockerfile = {"vulhub/nginx:1.11.13" = "base/nginx/1.11.13", "vulhub/php:7.1.3-fpm" = "base/php/7.1.3-fpm"}
+tags = ["Webserver"]
+
+[[environment]]
+name = "Nginx UI Unauthenticated Backup Download with Encryption Key Disclosure"
+cve = ["CVE-2026-27944"]
+app = "Nginx UI"
+path = "nginx-ui/CVE-2026-27944"
+dockerfile = {"vulhub/nginx-ui:2.3.2" = "base/nginx-ui/2.3.2"}
+tags = ["Info Disclosure"]
+
+[[environment]]
+name = "Node.js 8.5.0 Path Traversal"
+cve = ["CVE-2017-14849"]
+app = "Node.JS"
+path = "node/CVE-2017-14849"
+dockerfile = {"vulhub/node:8.5.0" = "base/node/8.5.0"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Node-Postgres Remote Code Execution"
+cve = ["CVE-2017-16082"]
+app = "node-postgres"
+path = "node/CVE-2017-16082"
+dockerfile = {"vulhub/node:9.0.0" = "base/node/9.0.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ntopng Permission Bypass"
+cve = ["CVE-2021-28073"]
+app = "ntopng"
+path = "ntopng/CVE-2021-28073"
+dockerfile = {"vulhub/ntopng:4.2" = "base/ntopng/4.2"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Apache OfBiz Deserialization Command Execution"
+cve = ["CVE-2020-9496"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2020-9496"
+dockerfile = {"vulhub/ofbiz:17.12.01" = "base/ofbiz/17.12.01"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Unsafe deserialization of XMLRPC arguments in Apache OFBiz"
+cve = ["CVE-2023-49070"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2023-49070"
+dockerfile = {"vulhub/ofbiz:18.12.09" = "base/ofbiz/18.12.09"}
+tags = ["Deserialization", "RCE"]
+
+[[environment]]
+name = "Apache OFBiz Authentication Bypass Leads to RCE"
+cve = ["CVE-2023-51467"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2023-51467"
+dockerfile = {"vulhub/ofbiz:18.12.10" = "base/ofbiz/18.12.10"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Apache OFBiz Authentication Bypass Leads to RCE"
+cve = ["CVE-2024-38856"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2024-38856"
+dockerfile = {"vulhub/ofbiz:18.12.14" = "base/ofbiz/18.12.14"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Apache OFBiz Authentication Bypass Leads to RCE"
+cve = ["CVE-2024-45195"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2024-45195"
+dockerfile = {"vulhub/ofbiz:18.12.15" = "base/ofbiz/18.12.15"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Apache OFBiz SSRF and Remote Code Execution"
+cve = ["CVE-2024-45507"]
+app = "Apache OFBiz"
+path = "ofbiz/CVE-2024-45507"
+dockerfile = {"vulhub/ofbiz:18.12.15" = "base/ofbiz/18.12.15"}
+tags = ["RCE", "SSRF"]
+
+[[environment]]
+name = "OpenClaw Cross-Site WebSocket Hijacking"
+cve = ["CVE-2026-25253"]
+app = "OpenClaw"
+path = "openclaw/CVE-2026-25253"
+dockerfile = {"vulhub/openclaw:2026.1.28" = "base/openclaw/2026.1.28"}
+tags = ["RCE", "Info Disclosure"]
+
+[[environment]]
+name = "Openfire Management Background Authentication Bypass"
+cve = ["CVE-2023-32315"]
+app = "Openfire"
+path = "openfire/CVE-2023-32315"
+dockerfile = {"vulhub/openfire:4.7.4" = "base/openfire/4.7.4"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "OpenSMTPD Remote Command Execution"
+cve = ["CVE-2020-7247"]
+app = "OpenSMTPD"
+path = "opensmtpd/CVE-2020-7247"
+dockerfile = {"vulhub/opensmtpd:6.6.1p1" = "base/opensmtpd/6.6.1p1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "OpenSSH Username Enumeration"
+cve = ["CVE-2018-15473"]
+app = "OpenSSH"
+path = "openssh/CVE-2018-15473"
+dockerfile = {"vulhub/openssh:7.7" = "base/openssh/7.7"}
+tags = ["Info Disclosure"]
+
+[[environment]]
+name = "OpenSSL Heartbleed Memory Leak Leads to Information Disclosure"
+cve = ["CVE-2014-0160"]
+app = "OpenSSL"
+path = "openssl/CVE-2014-0160"
+dockerfile = {"vulhub/openssl:1.0.1c-with-nginx" = "base/openssl/1.0.1c/with-nginx"}
+tags = ["Info Disclosure"]
+
+[[environment]]
+name = "OpenSSL Infinite Loop Leads to DoS"
+cve = ["CVE-2022-0778"]
+app = "OpenSSL"
+path = "openssl/CVE-2022-0778"
+dockerfile = {"vulhub/openssl:1.1.1m-with-curl" = "base/openssl/1.1.1m/with-curl"}
+tags = ["DoS"]
+
+[[environment]]
+name = "OpenTSDB Arbitrary Command Injection Remote Code Execution"
+cve = ["CVE-2020-35476"]
+app = "OpenTSDB"
+path = "opentsdb/CVE-2020-35476"
+dockerfile = {"vulhub/opentsdb:2.4.0" = "base/opentsdb/2.4.0"}
+tags = ["RCE"]
+
+[[environment]]
+name = "OpenTSDB Arbitrary Command Injection Remote Code Execution"
+cve = ["CVE-2023-25826"]
+app = "OpenTSDB"
+path = "opentsdb/CVE-2023-25826"
+dockerfile = {"vulhub/opentsdb:2.4.1" = "base/opentsdb/2.4.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ownCloud graphapi Information Disclosure"
+cve = ["CVE-2023-49103"]
+app = "ownCloud"
+path = "owncloud/CVE-2023-49103"
+dockerfile = {"vulhub/owncloud:10.12.1" = "base/owncloud/10.12.1"}
+tags = ["Info Disclosure"]
+
+[[environment]]
+name = "PDF.js Arbitrary JavaScript Code Execution"
+cve = ["CVE-2024-4367"]
+app = "PDF.js"
+path = "pdfjs/CVE-2024-4367"
+dockerfile = {"vulhub/pdfjs:4.1.392" = "base/pdfjs/4.1.392"}
+tags = ["RCE"]
+
+[[environment]]
+name = "pgAdmin <= 6.16 Unauthenticated Remote Command Execution"
+cve = ["CVE-2022-4223"]
+app = "pgAdmin"
+path = "pgadmin/CVE-2022-4223"
+dockerfile = {"vulhub/pgadmin:6.16" = "base/pgadmin/6.16"}
+tags = ["RCE"]
+
+[[environment]]
+name = "pgAdmin <= 7.6 Authenticated Remote Command Execution"
+cve = ["CVE-2023-5002"]
+app = "pgAdmin"
+path = "pgadmin/CVE-2023-5002"
+dockerfile = {"vulhub/pgadmin:7.6" = "base/pgadmin/7.6"}
+tags = ["RCE"]
+
+[[environment]]
+name = "pgAdmin4 <= 9.1 Authenticated Remote Code Execution"
+cve = ["CVE-2025-2945"]
+app = "pgAdmin"
+path = "pgadmin/CVE-2025-2945"
+dockerfile = {"vulhub/pgadmin:9.1" = "base/pgadmin/9.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "pgAdmin4 <= 9.10 Database Restore Tool Command Injection"
+cve = ["CVE-2025-13780"]
+app = "pgAdmin"
+path = "pgadmin/CVE-2025-13780"
+dockerfile = {"vulhub/pgadmin:9.10" = "base/pgadmin/9.10"}
+tags = ["RCE"]
+
+[[environment]]
+name = "PHP 8.1.0-dev User-Agentt Backdoor Remote Code Execution"
+cve = []
+app = "PHP"
+path = "php/8.1-backdoor"
+dockerfile = {"vulhub/php:8.1-backdoor" = "base/php/8.1-backdoor"}
+tags = ["RCE", "Backdoor"]
+
+[[environment]]
+name = "PHP-CGI Remote Code Execution"
+cve = ["CVE-2012-1823"]
+app = "PHP-CGI"
+path = "php/CVE-2012-1823"
+dockerfile = {"vulhub/php:5.4.1-cgi" = "base/php/5.4.1/cgi"}
+tags = ["RCE"]
+
+[[environment]]
+name = "PHP IMAP Remote Command Execution"
+cve = ["CVE-2018-19518"]
+app = "PHP-IMAP"
+path = "php/CVE-2018-19518"
+dockerfile = {"vulhub/php:5.6.38-apache" = "base/php/5.6.38-apache"}
+tags = ["RCE"]
+
+[[environment]]
+name = "PHP-FPM Remote Code Execution"
+cve = ["CVE-2019-11043"]
+app = "PHP-FPM"
+path = "php/CVE-2019-11043"
+dockerfile = {"vulhub/php:7.2.10-fpm" = "base/php/7.2.10-fpm"}
+tags = ["RCE"]
+
+[[environment]]
+name = "PHP File Read to Remote Code Execution Through GNU C Library Iconv"
+cve = ["CVE-2024-2961"]
+app = "PHP"
+path = "php/CVE-2024-2961"
+dockerfile = {"vulhub/php:8.3.4-apache" = "base/php/8.3.4-apache"}
+tags = ["RCE", "Path Traversal"]
+
+[[environment]]
+name = "PHP-FPM FastCGI Unauthorized Access Leads to Remote Code Execution"
+cve = []
+app = "PHP-FPM"
+path = "php/fpm"
+dockerfile = {"vulhub/php:7.1.3-fpm" = "base/php/7.1.3-fpm"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "PHP Local File Inclusion RCE with PHPINFO"
+cve = []
+app = "PHP"
+path = "php/inclusion"
+dockerfile = {"vulhub/php:7.1.3-apache" = "base/php/7.1.3-apache"}
+tags = ["RCE", "Path Traversal"]
+
+[[environment]]
+name = "PHP XML External Entity Injection (XXE)"
+cve = []
+app = "PHP"
+path = "php/php_xxe"
+dockerfile = {"vulhub/php:7.0.30" = "base/php/7.0.30"}
+tags = ["XXE"]
+
+[[environment]]
+name = "PHP XDebug Remote Debugging Code Execution"
+cve = []
+app = "PHP"
+path = "php/xdebug-rce"
+dockerfile = {"vulhub/php:7.1-xdebug" = "base/php/7.1-xdebug", "vulhub/php:7.4-xdebug" = "base/php/7.4-xdebug"}
+tags = ["RCE"]
+
+[[environment]]
+name = "PHPMailer Arbitrary File Read"
+cve = ["CVE-2017-5223"]
+app = "PHPMailer"
+path = "phpmailer/CVE-2017-5223"
+dockerfile = {"vulhub/phpmailer:5.2.20" = "base/phpmailer/5.2.20"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "phpMyAdmin 4.0.x-4.6.2 Remote Code Execution"
+cve = ["CVE-2016-5734"]
+app = "phpMyAdmin"
+path = "phpmyadmin/CVE-2016-5734"
+dockerfile = {"vulhub/phpmyadmin:4.4.15.6" = "base/phpmyadmin/4.4.15.6"}
+tags = ["RCE"]
+
+[[environment]]
+name = "phpmyadmin 4.8.1 Remote File Inclusion"
+cve = ["CVE-2018-12613"]
+app = "phpMyAdmin"
+path = "phpmyadmin/CVE-2018-12613"
+dockerfile = {"vulhub/phpmyadmin:4.8.1" = "base/phpmyadmin/4.8.1"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "phpmyadmin scripts/setup.php Deserialization"
+cve = []
+app = "phpMyAdmin"
+path = "phpmyadmin/WooYun-2016-199433"
+dockerfile = {"vulhub/phpmyadmin:2.8.0.4" = "base/phpmyadmin/2.8.0.4"}
+tags = ["Deserialization", "RCE"]
+
+[[environment]]
+name = "phpunit Remote Code Execution"
+cve = ["CVE-2017-9841"]
+app = "PHPUnit"
+path = "phpunit/CVE-2017-9841"
+dockerfile = {"vulhub/phpunit:5.6.2" = "base/phpunit/5.6.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Polkit pkexec Privilege Escalation"
+cve = ["CVE-2021-4034"]
+app = "Polkit Pkexec"
+path = "polkit/CVE-2021-4034"
+dockerfile = {"vulhub/polkit:0.105" = "base/polkit/0.105"}
+tags = ["Privilege Escalation"]
+
+[[environment]]
+name = "PostgreSQL Privilege Escalation"
+cve = ["CVE-2018-1058"]
+app = "PostgreSQL"
+path = "postgres/CVE-2018-1058"
+dockerfile = {"vulhub/postgres:9.6.7" = "base/postgres/9.6.7"}
+tags = ["Privilege Escalation", "Database"]
+
+[[environment]]
+name = "PostgreSQL Arbitrary Command Execution with Admin Privileges"
+cve = ["CVE-2019-9193"]
+app = "PostgreSQL"
+path = "postgres/CVE-2019-9193"
+dockerfile = {"vulhub/postgres:10.7" = "base/postgres/10.7"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "aiohttp Directory Traversal Vulnerability"
+cve = ["CVE-2024-23334"]
+app = "Python"
+path = "python/CVE-2024-23334"
+dockerfile = {"vulhub/aiohttp:3.9.1" = "base/python/aiohttp/3.9.1"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Python PIL/Pillow Remote Command Execution by GhostScript GhostButt"
+cve = ["CVE-2017-8291"]
+app = "Python"
+path = "python/PIL-CVE-2017-8291"
+dockerfile = {"vulhub/ghostscript:9.21-with-flask" = "base/ghostscript/9.21/with-flask"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Python PIL/Pillow Remote Command Execution by GhostScript"
+cve = ["CVE-2018-16509"]
+app = "Python"
+path = "python/PIL-CVE-2018-16509"
+dockerfile = {"vulhub/ghostscript:9.23-with-flask" = "base/ghostscript/9.23/with-flask"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Python Unpickle Deserialization Remote Code Execution"
+cve = []
+app = "Python"
+path = "python/unpickle"
+dockerfile = {"vulhub/flask:1.1.1" = "base/flask/1.1.1"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Ruby on Rails Path Traversal"
+cve = ["CVE-2018-3760"]
+app = "Ruby on Rails"
+path = "rails/CVE-2018-3760"
+dockerfile = {"vulhub/rails:5.0.7" = "base/rails/5.0.7"}
+tags = ["Path Traversal", "Framework"]
+
+[[environment]]
+name = "Ruby on Rails Path Traversal and Arbitrary File Read"
+cve = ["CVE-2019-5418"]
+app = "Ruby on Rails"
+path = "rails/CVE-2019-5418"
+dockerfile = {"vulhub/rails:5.2.2" = "base/rails/5.2.2"}
+tags = ["Path Traversal", "Framework"]
+
+[[environment]]
+name = "React Server Components Flight Protocol Deserialization RCE"
+cve = ["CVE-2025-55182"]
+app = "React"
+path = "react/CVE-2025-55182"
+dockerfile = {"vulhub/nextjs:15.5.6" = "base/next.js/15.5.6"}
+tags = ["RCE", "Deserialization", "Framework"]
+
+[[environment]]
+name = "Redis 4.x/5.x Command Execution due to Master-Slave Replication"
+cve = []
+app = "Redis"
+path = "redis/4-unacc"
+dockerfile = {"vulhub/redis:4.0.14" = "base/redis/4.0.14"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "Redis Lua Sandbox Bypass Command Execution"
+cve = ["CVE-2022-0543"]
+app = "Redis"
+path = "redis/CVE-2022-0543"
+dockerfile = {"vulhub/redis:5.0.7" = "base/redis/5.0.7"}
+tags = ["RCE", "Database"]
+
+[[environment]]
+name = "Rocket Chat Pre-Auth Blind NoSQL Injection"
+cve = ["CVE-2021-22911"]
+app = "Rocket.Chat"
+path = "rocketchat/CVE-2021-22911"
+dockerfile = {"vulhub/rocketchat:3.12.1" = "base/rocketchat/3.12.1"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "Apache RocketMQ Broker Remote Command Execution"
+cve = ["CVE-2023-33246"]
+app = "Apache RocketMQ"
+path = "rocketmq/CVE-2023-33246"
+dockerfile = {"vulhub/rocketmq:5.1.0" = "base/rocketmq/5.1.0"}
+tags = ["RCE", "Message Queue"]
+
+[[environment]]
+name = "Apache RocketMQ NameServer Arbitrary File Write"
+cve = ["CVE-2023-37582"]
+app = "Apache RocketMQ"
+path = "rocketmq/CVE-2023-37582"
+dockerfile = {"vulhub/rocketmq:5.1.0" = "base/rocketmq/5.1.0"}
+tags = ["File Upload", "Message Queue"]
+
+[[environment]]
+name = "Rsync Unauthorized Access"
+cve = []
+app = "rsync"
+path = "rsync/common"
+dockerfile = {"vulhub/rsync:3.1.2" = "base/rsync/3.1.2"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Ruby Net::FTP Module Command Injection"
+cve = ["CVE-2017-17405"]
+app = "Ruby"
+path = "ruby/CVE-2017-17405"
+dockerfile = {"vulhub/ruby:2.4.1" = "base/ruby/2.4.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "SaltStack Information Disclosure Leads to Privilege Escalation"
+cve = ["CVE-2020-11651"]
+app = "SaltStack"
+path = "saltstack/CVE-2020-11651"
+dockerfile = {"vulhub/saltstack:2019.2.3" = "base/saltstack/2019.2.3"}
+tags = ["Privilege Escalation", "Info Disclosure"]
+
+[[environment]]
+name = "SaltStack Arbitrary File Read and Write"
+cve = ["CVE-2020-11652"]
+app = "SaltStack"
+path = "saltstack/CVE-2020-11652"
+dockerfile = {"vulhub/saltstack:2019.2.3" = "base/saltstack/2019.2.3"}
+tags = ["File Upload", "Path Traversal"]
+
+[[environment]]
+name = "SaltStack Command Injection Remote Code Execution"
+cve = ["CVE-2020-16846"]
+app = "SaltStack"
+path = "saltstack/CVE-2020-16846"
+dockerfile = {"vulhub/saltstack:3002" = "base/saltstack/3002"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Samba Remote Command Execution"
+cve = ["CVE-2017-7494"]
+app = "Samba"
+path = "samba/CVE-2017-7494"
+dockerfile = {"vulhub/samba:4.6.3" = "base/samba/4.6.3"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Scrapyd Unauthorized Access"
+cve = []
+app = "Scrapyd"
+path = "scrapy/scrapyd-unacc"
+dockerfile = {"vulhub/scrapyd:1.2.1" = "base/scrapyd/1.2.1"}
+tags = ["Auth Bypass", "RCE"]
+
+[[environment]]
+name = "Apache Shiro Authentication Bypass"
+cve = ["CVE-2010-3863"]
+app = "Apache Shiro"
+path = "shiro/CVE-2010-3863"
+dockerfile = {"vulhub/shiro:1.0.0" = "base/shiro/1.0.0"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Apache Shiro 1.2.4 Deserialization Remote Code Execution"
+cve = ["CVE-2016-4437"]
+app = "Apache Shiro"
+path = "shiro/CVE-2016-4437"
+dockerfile = {"vulhub/shiro:1.2.4" = "base/shiro/1.2.4"}
+tags = ["RCE", "Deserialization", "Hard Coding"]
+
+[[environment]]
+name = "Apache Shiro Authentication Bypass"
+cve = ["CVE-2020-1957"]
+app = "Apache Shiro"
+path = "shiro/CVE-2020-1957"
+dockerfile = {"vulhub/shiro:1.5.1" = "base/shiro/1.5.1"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "ShowDoc 3.2.5 SQL Injection"
+cve = []
+app = "ShowDoc"
+path = "showdoc/3.2.5-sqli"
+dockerfile = {"vulhub/showdoc:3.2.4" = "base/showdoc/3.2.4"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "ShowDoc Unauthenticated File Upload and Remote Code Execution"
+cve = []
+app = "ShowDoc"
+path = "showdoc/CNVD-2020-26585"
+dockerfile = {"vulhub/showdoc:2.8.2" = "base/showdoc/2.8.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache Skywalking 8.3.0 SQL Injection"
+cve = []
+app = "Apache SkyWalking"
+path = "skywalking/8.3.0-sqli"
+dockerfile = {"vulhub/skywalking:8.3.0" = "base/skywalking/8.3.0"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "Apache Solr Remote Command Execution"
+cve = ["CVE-2017-12629"]
+app = "Apache Solr"
+path = "solr/CVE-2017-12629-RCE"
+dockerfile = {"vulhub/solr:7.0.1" = "base/solr/7.0.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache Solr XML External Entity Injection"
+cve = ["CVE-2017-12629"]
+app = "Apache Solr"
+path = "solr/CVE-2017-12629-XXE"
+dockerfile = {"vulhub/solr:7.0.1" = "base/solr/7.0.1"}
+tags = ["XXE"]
+
+[[environment]]
+name = "Apache Solr Remote Command Execution"
+cve = ["CVE-2019-0193"]
+app = "Apache Solr"
+path = "solr/CVE-2019-0193"
+dockerfile = {"vulhub/solr:8.1.1" = "base/solr/8.1.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Apache Solr Remote Code Execution Via Velocity Template"
+cve = ["CVE-2019-17558"]
+app = "Apache Solr"
+path = "solr/CVE-2019-17558"
+dockerfile = {"vulhub/solr:8.2.0" = "base/solr/8.2.0"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "Apache Solr RemoteStreaming Arbitrary File Reading and SSRF"
+cve = []
+app = "Apache Solr"
+path = "solr/Remote-Streaming-Fileread"
+dockerfile = {"vulhub/solr:8.8.1" = "base/solr/8.8.1"}
+tags = ["Path Traversal", "SSRF"]
+
+[[environment]]
+name = "Apache Spark Unauthorized Access Leads to Remote Code Execution"
+cve = []
+app = "Apache Spark"
+path = "spark/unacc"
+dockerfile = {"vulhub/spark:2.3.1" = "base/spark/2.3.1"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "Spring Security Oauth2 Remote Command Execution"
+cve = ["CVE-2016-4977"]
+app = "Spring Security Oauth2"
+path = "spring/CVE-2016-4977"
+dockerfile = {"vulhub/spring-security-oauth2:2.0.8" = "base/spring/spring-security-oauth2/2.0.8"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring WebFlow Remote Code Execution"
+cve = ["CVE-2017-4971"]
+app = "Spring Webflow"
+path = "spring/CVE-2017-4971"
+dockerfile = {"vulhub/spring-webflow:2.4.4" = "base/spring/spring-webflow/2.4.4"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring Data Rest Remote Command Execution"
+cve = ["CVE-2017-8046"]
+app = "Spring Data Rest"
+path = "spring/CVE-2017-8046"
+dockerfile = {"vulhub/spring-rest-data:2.6.6" = "base/spring/spring-rest-data/2.6.6"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring Messaging Remote Command Execution"
+cve = ["CVE-2018-1270"]
+app = "Spring Messaging"
+path = "spring/CVE-2018-1270"
+dockerfile = {"vulhub/spring-messaging:5.0.4" = "base/spring/spring-messaging/5.0.4"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring Data Commons Remote Command Execution"
+cve = ["CVE-2018-1273"]
+app = "Spring Data Commons"
+path = "spring/CVE-2018-1273"
+dockerfile = {"vulhub/spring-data-commons:2.0.5" = "base/spring/spring-data-commons/2.0.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring Cloud Gateway Actuator API SpEL Expression Injection Command Execution"
+cve = ["CVE-2022-22947"]
+app = "Spring Cloud Gateway"
+path = "spring/CVE-2022-22947"
+dockerfile = {"vulhub/spring-cloud-gateway:3.1.0" = "base/spring/spring-cloud-gateway/3.1.0"}
+tags = ["RCE", "Expression Injection", "Framework"]
+
+[[environment]]
+name = "Spring Cloud Function SpEL Expression Command Injection"
+cve = ["CVE-2022-22963"]
+app = "Spring Cloud Function"
+path = "spring/CVE-2022-22963"
+dockerfile = {"vulhub/spring-cloud-function:3.2.2" = "base/spring/spring-cloud-function/3.2.2"}
+tags = ["RCE", "Expression Injection", "Framework"]
+
+[[environment]]
+name = "Spring Framework Data Binding Remote Code Execution on JDK 9+"
+cve = ["CVE-2022-22965"]
+app = "Spring"
+path = "spring/CVE-2022-22965"
+dockerfile = {"vulhub/spring-webmvc:5.3.17" = "base/spring/spring-webmvc/5.3.17"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Spring Framework Path Traversal via Jetty URI Parsing Inconsistency"
+cve = ["CVE-2025-41242"]
+app = "Spring"
+path = "spring/CVE-2025-41242"
+dockerfile = {"vulhub/spring-boot-jetty:3.2.4" = "base/spring/spring-boot-jetty/3.2.4"}
+tags = ["Path Traversal", "Info Disclosure", "Framework"]
+
+[[environment]]
+name = "Spring Security Authorization Bypass in RegexRequestMatcher"
+cve = ["CVE-2022-22978"]
+app = "Spring"
+path = "spring/CVE-2022-22978"
+dockerfile = {"vulhub/spring-security:5.6.3" = "base/spring/spring-security/5.6.3"}
+tags = ["Auth Bypass", "Framework"]
+
+[[environment]]
+name = "S2-001 Remote Code Execution"
+cve = []
+app = "Apache Struts2"
+path = "struts2/s2-001"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-005 Remote Code Execution"
+cve = ["CVE-2010-1870"]
+app = "Apache Struts2"
+path = "struts2/s2-005"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-007 Remote Code Execution"
+cve = []
+app = "Apache Struts2"
+path = "struts2/s2-007"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-008 Remote Code Execution"
+cve = ["CVE-2012-0391"]
+app = "Apache Struts2"
+path = "struts2/s2-008"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-009 Remote Code Execution"
+cve = ["CVE-2011-3923"]
+app = "Apache Struts2"
+path = "struts2/s2-009"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-012 Remote Code Execution"
+cve = ["CVE-2013-1965"]
+app = "Apache Struts2"
+path = "struts2/s2-012"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-013 Remote Code Execution"
+cve = ["CVE-2013-1966"]
+app = "Apache Struts2"
+path = "struts2/s2-013"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-015 Remote Code Execution"
+cve = ["CVE-2013-2134", "CVE-2013-2135"]
+app = "Apache Struts2"
+path = "struts2/s2-015"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-016 Remote Code Execution"
+cve = ["CVE-2013-2251"]
+app = "Apache Struts2"
+path = "struts2/s2-016"
+dockerfile = {"vulhub/tomcat:8.5" = "base/tomcat/tomcat8.5"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-032 Remote Code Execution"
+cve = ["CVE-2016-3081"]
+app = "Apache Struts2"
+path = "struts2/s2-032"
+dockerfile = {"vulhub/struts2:2.3.28" = "base/struts2/2.3.28"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-045 Remote Code Execution"
+cve = ["CVE-2017-5638"]
+app = "Apache Struts2"
+path = "struts2/s2-045"
+dockerfile = {"vulhub/struts2:2.3.30" = "base/struts2/2.3.30"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-046 Remote Code Execution"
+cve = ["CVE-2017-5638"]
+app = "Apache Struts2"
+path = "struts2/s2-046"
+dockerfile = {"vulhub/struts2:2.3.30" = "base/struts2/2.3.30"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-048 Remote Code Execution"
+cve = ["CVE-2017-9791"]
+app = "Apache Struts2"
+path = "struts2/s2-048"
+dockerfile = {"vulhub/struts2:2.3.32-showcase" = "base/struts2/2.3.32-showcase"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-052 Remote Code Execution"
+cve = ["CVE-2017-9805"]
+app = "Apache Struts2"
+path = "struts2/s2-052"
+dockerfile = {"vulhub/struts2:2.5.12-rest-showcase" = "base/struts2/2.5.12-rest-showcase"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "S2-053 Remote Code Execution"
+cve = ["CVE-2017-12611"]
+app = "Apache Struts2"
+path = "struts2/s2-053"
+dockerfile = {"vulhub/struts2:s2-053" = "base/struts2/s2-053"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Struts2 S2-057 Remote Command Execution"
+cve = ["CVE-2018-11776"]
+app = "Apache Struts2"
+path = "struts2/s2-057"
+dockerfile = {"vulhub/struts2:2.3.34-showcase" = "base/struts2/2.3.34-showcase"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Struts2 S2-059 Remote Command Execution"
+cve = ["CVE-2019-0230"]
+app = "Apache Struts2"
+path = "struts2/s2-059"
+dockerfile = {"vulhub/struts2:2.5.16" = "base/struts2/2.5.16"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Struts2 S2-061 Remote Command Execution"
+cve = ["CVE-2020-17530"]
+app = "Apache Struts2"
+path = "struts2/s2-061"
+dockerfile = {"vulhub/struts2:2.5.25" = "base/struts2/2.5.25"}
+tags = ["RCE", "Framework"]
+
+[[environment]]
+name = "Struts2 S2-066 Upload Path Traversal"
+cve = ["CVE-2023-50164"]
+app = "Apache Struts2"
+path = "struts2/s2-066"
+dockerfile = {"vulhub/struts2:s2-066" = "base/struts2/s2-066"}
+tags = ["Path Traversal", "Framework"]
+
+[[environment]]
+name = "Struts2 S2-067 Upload Path Traversal"
+cve = ["CVE-2024-53677"]
+app = "Apache Struts2"
+path = "struts2/s2-067"
+dockerfile = {"vulhub/struts2:s2-067" = "base/struts2/s2-067"}
+tags = ["Path Traversal", "Framework"]
+
+[[environment]]
+name = "Apache Superset Hardcoded JWT Secret Key Leads to Authentication Bypass"
+cve = ["CVE-2023-27524"]
+app = "Apache Superset"
+path = "superset/CVE-2023-27524"
+dockerfile = {"vulhub/superset:2.0.1" = "base/superset/2.0.1"}
+tags = ["Auth Bypass", "Hard Coding"]
+
+[[environment]]
+name = "Apache Superset Python Pickle Deserialization Leads to RCE"
+cve = ["CVE-2023-37941"]
+app = "Apache Superset"
+path = "superset/CVE-2023-37941"
+dockerfile = {"vulhub/superset:2.0.1" = "base/superset/2.0.1"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "Supervisord XML-RPC Remote Command Execution"
+cve = ["CVE-2017-11610"]
+app = "Supervisor"
+path = "supervisor/CVE-2017-11610"
+dockerfile = {"vulhub/supervisor:3.3.2" = "base/supervisor/3.3.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Jetbrains TeamCity Authentication Bypass and Remote Command Execution"
+cve = ["CVE-2023-42793"]
+app = "TeamCity"
+path = "teamcity/CVE-2023-42793"
+dockerfile = {"vulhub/teamcity:2023.05.3" = "base/teamcity/2023.05.3"}
+tags = ["RCE", "Auth Bypass"]
+
+[[environment]]
+name = "JetBrains TeamCity Authentication Bypass"
+cve = ["CVE-2024-27198"]
+app = "TeamCity"
+path = "teamcity/CVE-2024-27198"
+dockerfile = {"vulhub/teamcity:2023.11.3" = "base/teamcity/2023.11.3"}
+tags = ["Auth Bypass", "RCE"]
+
+[[environment]]
+name = "ThinkPHP 2.x Remote Code Execution"
+cve = []
+app = "ThinkPHP"
+path = "thinkphp/2-rce"
+dockerfile = {"vulhub/thinkphp:2.1" = "base/thinkphp/2.1"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ThinkPHP5 5.0.22/5.1.29 Remote Code Execution"
+cve = []
+app = "ThinkPHP"
+path = "thinkphp/5-rce"
+dockerfile = {"vulhub/thinkphp:5.0.20" = "base/thinkphp/5.0.20"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ThinkPHP5 5.0.23 Remote Code Execution"
+cve = []
+app = "ThinkPHP"
+path = "thinkphp/5.0.23-rce"
+dockerfile = {"vulhub/thinkphp:5.0.23" = "base/thinkphp/5.0.23"}
+tags = ["RCE"]
+
+[[environment]]
+name = "ThinkPHP5 SQL Injection Vulnerabilities/Information Leakage"
+cve = []
+app = "ThinkPHP"
+path = "thinkphp/in-sqlinjection"
+dockerfile = {"vulhub/thinkphp:5.0.9" = "base/thinkphp/5.0.9"}
+tags = ["SQL Injection", "Info Disclosure"]
+
+[[environment]]
+name = "ThinkPHP Multilingual Local File Inclusion"
+cve = []
+app = "ThinkPHP"
+path = "thinkphp/lang-rce"
+dockerfile = {"vulhub/thinkphp:6.0.12" = "base/thinkphp/6.0.12"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Tiki Wiki CMS Groupware Authentication Bypass"
+cve = ["CVE-2020-15906"]
+app = "Tiki Wiki"
+path = "tikiwiki/CVE-2020-15906"
+dockerfile = {"vulhub/tikiwiki:21.1" = "base/tikiwiki/21.1"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "Tomcat Arbitrary Writing of Files in the PUT Method"
+cve = ["CVE-2017-12615"]
+app = "Apache Tomcat"
+path = "tomcat/CVE-2017-12615"
+dockerfile = {"vulhub/tomcat:8.5.19" = "base/tomcat/tomcat8.5.19"}
+tags = ["File Upload", "Webserver"]
+
+[[environment]]
+name = "Apache Tomcat AJP Bug"
+cve = ["CVE-2020-1938"]
+app = "Apache Tomcat"
+path = "tomcat/CVE-2020-1938"
+dockerfile = {"vulhub/tomcat:9.0.30" = "base/tomcat/9.0.30"}
+tags = ["Auth Bypass", "Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Tomcat Session Deserialization Remote Code Execution"
+cve = ["CVE-2025-24813"]
+app = "Apache Tomcat"
+path = "tomcat/CVE-2025-24813"
+dockerfile = {"vulhub/tomcat:9.0.97" = "base/tomcat/9.0.97"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "Tomcat Tribes EncryptInterceptor Bypass Remote Code Execution"
+cve = ["CVE-2026-34486"]
+app = "Apache Tomcat"
+path = "tomcat/CVE-2026-34486"
+dockerfile = {"vulhub/tomcat:9.0.116" = "base/tomcat/9.0.116"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "Tomcat Weak Password"
+cve = []
+app = "Apache Tomcat"
+path = "tomcat/tomcat8"
+dockerfile = {"vulhub/tomcat:8.0" = "base/tomcat/tomcat8.0"}
+tags = ["Auth Bypass", "Webserver"]
+
+[[environment]]
+name = "Apache Unomi Expression Language Injection RCE"
+cve = ["CVE-2020-13942"]
+app = "Apache Unomi"
+path = "unomi/CVE-2020-13942"
+dockerfile = {"vulhub/unomi:1.5.1" = "base/unomi/1.5.1"}
+tags = ["RCE", "Expression Injection"]
+
+[[environment]]
+name = "uWSGI PHP Directory Traversal"
+cve = ["CVE-2018-7490"]
+app = "uWSGI"
+path = "uwsgi/CVE-2018-7490"
+dockerfile = {"vulhub/uwsgi-php:2.0.16" = "base/uwsgi/php/2.0.16"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "uWSGI Unauthorized Access"
+cve = []
+app = "uWSGI"
+path = "uwsgi/unacc"
+dockerfile = {"vulhub/uwsgi-python:2.0.17" = "base/uwsgi/python/2.0.17"}
+tags = ["Auth Bypass", "RCE"]
+
+[[environment]]
+name = "V2board 1.6.1 Privilege Escalation"
+cve = []
+app = "V2board"
+path = "v2board/1.6-privilege-escalation"
+dockerfile = {"vulhub/v2board:1.6.1" = "base/v2board/1.6.1"}
+tags = ["Privilege Escalation"]
+
+[[environment]]
+name = "Vite Development Server Arbitrary File Read"
+cve = []
+app = "Vite"
+path = "vite/CNVD-2022-44615"
+dockerfile = {"vulhub/vite:2.1.5" = "base/vite/2.1.5"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Vite Development Server Arbitrary File Read Bypass"
+cve = ["CVE-2025-30208"]
+app = "Vite"
+path = "vite/CVE-2025-30208"
+dockerfile = {"vulhub/vite:6.2.2" = "base/vite/6.2.2"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Vite Development Server Arbitrary File Read via Hash Character Bypass"
+cve = ["CVE-2025-32395"]
+app = "Vite"
+path = "vite/CVE-2025-32395"
+dockerfile = {"vulhub/vite:6.2.5" = "base/vite/6.2.5"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "Vite Development Server WebSocket Arbitrary File Read"
+cve = ["CVE-2026-39363"]
+app = "Vite"
+path = "vite/CVE-2026-39363"
+dockerfile = {"vulhub/vite:7.3.1" = "base/vite/7.3.1"}
+tags = ["Path Traversal"]
+
+[[environment]]
+name = "WebLogic < 10.3.6 'wls-wsat' XMLDecoder Deserialization Remote Command Execution"
+cve = ["CVE-2017-10271"]
+app = "WebLogic"
+path = "weblogic/CVE-2017-10271"
+dockerfile = {"vulhub/weblogic:10.3.6.0-2017" = "base/weblogic"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "Weblogic WLS Core Components Deserialization Remote Command Execution"
+cve = ["CVE-2018-2628"]
+app = "WebLogic"
+path = "weblogic/CVE-2018-2628"
+dockerfile = {"vulhub/weblogic:10.3.6.0-2017" = "base/weblogic"}
+tags = ["RCE", "Deserialization", "Webserver"]
+
+[[environment]]
+name = "WebLogic Arbitrary File Upload"
+cve = ["CVE-2018-2894"]
+app = "WebLogic"
+path = "weblogic/CVE-2018-2894"
+dockerfile = {"vulhub/weblogic:12.2.1.3-2018" = "base/weblogic/12.2.1.3"}
+tags = ["File Upload", "Webserver"]
+
+[[environment]]
+name = "WebLogic Management Console Unauthorized Remote Command Execution"
+cve = ["CVE-2020-14882"]
+app = "WebLogic"
+path = "weblogic/CVE-2020-14882"
+dockerfile = {"vulhub/weblogic:12.2.1.3-2018" = "base/weblogic/12.2.1.3"}
+tags = ["RCE", "Webserver"]
+
+[[environment]]
+name = "WebLogic Pre-Auth Remote Command Execution"
+cve = ["CVE-2023-21839"]
+app = "WebLogic"
+path = "weblogic/CVE-2023-21839"
+dockerfile = {"vulhub/weblogic:12.2.1.3-2018" = "base/weblogic/12.2.1.3"}
+tags = ["RCE", "Webserver"]
+
+[[environment]]
+name = "Weblogic UDDI Explorer Server-Side Request Forgery (SSRF)"
+cve = []
+app = "WebLogic"
+path = "weblogic/ssrf"
+dockerfile = {"vulhub/baselinux:centos-6" = "base/baselinux/centos-6", "vulhub/weblogic:10.3.6.0-2017" = "base/weblogic"}
+tags = ["SSRF", "Webserver"]
+
+[[environment]]
+name = "WebLogic Weak Password, Arbitrary File Read and Remote Code Execution"
+cve = []
+app = "WebLogic"
+path = "weblogic/weak_password"
+dockerfile = {"vulhub/weblogic:10.3.6.0-2017" = "base/weblogic"}
+tags = ["RCE", "Path Traversal", "Webserver"]
+
+[[environment]]
+name = "Webmin Remote Command Execution"
+cve = ["CVE-2019-15107"]
+app = "Webmin"
+path = "webmin/CVE-2019-15107"
+dockerfile = {"vulhub/webmin:1.910" = "base/webmin/1.910"}
+tags = ["RCE"]
+
+[[environment]]
+name = "WordPress Pre-Auth RCE via REST API Batch Route Confusion and SQL Injection (wp2shell)"
+cve = ["CVE-2026-63030", "CVE-2026-60137"]
+app = "Wordpress"
+path = "wordpress/CVE-2026-63030"
+dockerfile = {"vulhub/wordpress:6.9.4" = "base/wordpress/6.9.4"}
+tags = ["RCE", "SQL Injection", "Privilege Escalation", "CMS"]
+
+[[environment]]
+name = "Wordpress 4.6 Arbitrary Command Execution (PwnScriptum)"
+cve = []
+app = "Wordpress"
+path = "wordpress/pwnscriptum"
+dockerfile = {"vulhub/wordpress:4.6" = "base/wordpress/4.6"}
+tags = ["RCE", "CMS"]
+
+[[environment]]
+name = "XStream Deserialization Command Execution"
+cve = ["CVE-2021-21351"]
+app = "XStream"
+path = "xstream/CVE-2021-21351"
+dockerfile = {"vulhub/xstream:1.4.15" = "base/xstream/1.4.15"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "XStream Deserialization Command Execution"
+cve = ["CVE-2021-29505"]
+app = "XStream"
+path = "xstream/CVE-2021-29505"
+dockerfile = {"vulhub/xstream:1.4.16" = "base/xstream/1.4.16"}
+tags = ["RCE", "Deserialization"]
+
+[[environment]]
+name = "XXL-JOB Executor Unauthorized Access"
+cve = []
+app = "XXL-JOB"
+path = "xxl-job/unacc"
+dockerfile = {"vulhub/xxl-job:2.2.0-admin" = "base/xxl-job/2.2.0/admin", "vulhub/xxl-job:2.2.0-executor" = "base/xxl-job/2.2.0/executor"}
+tags = ["Auth Bypass"]
+
+[[environment]]
+name = "YApi NoSQL Injection to Remote Command Execution"
+cve = []
+app = "YApi"
+path = "yapi/mongodb-inj"
+dockerfile = {"vulhub/yapi:1.10.2" = "base/yapi/1.10.2"}
+tags = ["SQL Injection", "RCE"]
+
+[[environment]]
+name = "YApi Open Registration due to RCE"
+cve = []
+app = "YApi"
+path = "yapi/unacc"
+dockerfile = {"vulhub/yapi:1.9.2" = "base/yapi/1.9.2"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Zabbix latest.php SQL Injection"
+cve = ["CVE-2016-10134"]
+app = "Zabbix"
+path = "zabbix/CVE-2016-10134"
+dockerfile = {"vulhub/zabbix:3.0.3-server" = "base/zabbix/3.0.3/server", "vulhub/zabbix:3.0.3-web" = "base/zabbix/3.0.3/web"}
+tags = ["SQL Injection"]
+
+[[environment]]
+name = "Zabbix Server Active Proxy Trapper Command Injection"
+cve = ["CVE-2017-2824"]
+app = "Zabbix"
+path = "zabbix/CVE-2017-2824"
+dockerfile = {"vulhub/zabbix:3.0.3-server" = "base/zabbix/3.0.3/server", "vulhub/zabbix:3.0.3-web" = "base/zabbix/3.0.3/web"}
+tags = ["RCE"]
+
+[[environment]]
+name = "Zabbix Server Active Proxy Trapper Command Injection Bypass"
+cve = ["CVE-2020-11800"]
+app = "Zabbix"
+path = "zabbix/CVE-2020-11800"
+dockerfile = {"vulhub/zabbix:3.0.3-server" = "base/zabbix/3.0.3/server", "vulhub/zabbix:3.0.3-web" = "base/zabbix/3.0.3/web"}
+tags = ["RCE"]
