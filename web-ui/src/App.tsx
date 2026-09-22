@@ -12,6 +12,7 @@ export type RouteId =
   | 'agent'
   | 'blackboard'
   | 'approval'
+  | 'intel'
   | 'evidence'
   | 'network'
   | 'poc'
@@ -22,7 +23,8 @@ const NAV: { id: RouteId; label: string; hint: string }[] = [
   { id: 'agent', label: 'Agent 工作台', hint: 'DeepSeek Harness' },
   { id: 'blackboard', label: '画板展示', hint: '会话 fact-intent 图' },
   { id: 'approval', label: '审批', hint: '高危动作确认' },
-  { id: 'evidence', label: '证据', hint: '会话取证浏览' },
+  { id: 'intel', label: '情报资产库', hint: '目标资产与情报' },
+  { id: 'evidence', label: '漏洞成果库', hint: '已验证漏洞归档' },
   { id: 'network', label: '网络时间线', hint: '捕获 / 拦截 / 重放' },
   { id: 'poc', label: 'poc 扫描', hint: '漏洞验证模板' },
   { id: 'proxypool', label: '代理池', hint: '出站代理条目' },
@@ -182,8 +184,11 @@ export function App() {
             onRefresh={refreshApprovals}
           />
         )}
+        {route === 'intel' && (
+          <Placeholder title="情报资产库" detail="主机、域名、账号与情报线索会在这里归档浏览。" />
+        )}
         {route === 'evidence' && (
-          <Placeholder title="证据" detail="会话产物、截图与工具输出会在这里按 Run 归档浏览。" />
+          <Placeholder title="漏洞成果库" detail="已验证漏洞、截图与工具输出会在这里按 Run 归档浏览。" />
         )}
         {route === 'network' && <NetworkTimeline />}
         {route === 'poc' && <PocScan />}
@@ -294,6 +299,14 @@ function icon(id: RouteId) {
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M12 3 20 7v5c0 5-3.2 8.4-8 9-4.8-.6-8-4-8-9V7l8-4Z" />
           <path d="m9 12 2.2 2.2L15.5 10" />
+        </svg>
+      )
+    case 'intel':
+      return (
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <ellipse cx="12" cy="6.5" rx="7" ry="2.5" />
+          <path d="M5 6.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5" />
+          <path d="M5 11.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5" />
         </svg>
       )
     case 'evidence':
