@@ -1,0 +1,10 @@
+{
+  "board_fact_prefill": true,
+  "board_fact_snapshot_saved": true,
+  "in_page_source_navigation": true,
+  "poc_result_fixture_archived": true,
+  "poc_artifacts": 4,
+  "poc_stays_pending": true,
+  "response_screenshot_label": true,
+  "network_scan_executed": false
+}

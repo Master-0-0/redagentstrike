@@ -30,6 +30,11 @@ class Settings:
     proxy_host: str = "127.0.0.1"
     proxy_port: int = 8088
     join_window_s: float = 8.0
+    findings_file_limit: int = 20 * 1024 * 1024
+    findings_total_limit: int = 100 * 1024 * 1024
+    findings_manifest_limit: int = 1024 * 1024
+    findings_max_files: int = 20
+    findings_max_network_refs: int = 20
     body_limit: int = 1_000_000
     header_value_limit: int = 0
     url_limit: int = 2048
@@ -126,6 +131,11 @@ def load_settings() -> Settings:
         dsh_port=int(os.environ.get("WORKBENCH_DSH_PORT", "3081")),
         manage_dsh=manage_dsh,
         dsh_home=_default_dsh_home(),
+        findings_file_limit=int(os.environ.get("WORKBENCH_FINDINGS_FILE_LIMIT", 20 * 1024 * 1024)),
+        findings_total_limit=int(os.environ.get("WORKBENCH_FINDINGS_TOTAL_LIMIT", 100 * 1024 * 1024)),
+        findings_manifest_limit=int(os.environ.get("WORKBENCH_FINDINGS_MANIFEST_LIMIT", 1024 * 1024)),
+        findings_max_files=int(os.environ.get("WORKBENCH_FINDINGS_MAX_FILES", 20)),
+        findings_max_network_refs=int(os.environ.get("WORKBENCH_FINDINGS_MAX_NETWORK_REFS", 20)),
         body_limit=int(os.environ.get("WORKBENCH_BODY_LIMIT", "1000000")),
         header_value_limit=int(os.environ.get("WORKBENCH_HEADER_VALUE_LIMIT", "0")),
     )

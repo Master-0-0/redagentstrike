@@ -1,3 +1,5 @@
+import { ArchiveForm } from '../findings/ArchiveForm'
+import '../findings/findings.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BlackboardGraph, selectedDetail } from '@cairn/client/BlackboardGraph.tsx'
 import { zh, type BlackboardKey } from '@cairn/client/locales.ts'
@@ -56,9 +58,10 @@ function statusLabel(status: string | null): string {
   return status ?? '未知'
 }
 
-export function BlackboardPage() {
+export function BlackboardPage({ initialSelection }: {initialSelection?: Selection | null}) {
+  const [archiving, setArchiving] = useState(false)
   const [catalog, setCatalog] = useState<BlackboardCatalog | null>(null)
-  const [selected, setSelected] = useState<Selection | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(initialSelection ?? null)
   const [snapshot, setSnapshot] = useState<BoardRead | { kind: 'error'; message: string }>()
   const [selectedId, setSelectedId] = useState<string>()
   const [loadingList, setLoadingList] = useState(true)
@@ -234,6 +237,7 @@ export function BlackboardPage() {
                   <div className="dsh-bb-detail">
                     <p className="dsh-bb-detail-kicker">{detail.kicker}</p>
                     <p className="dsh-bb-detail-body">{detail.body}</p>
+                    {view.nodes.some(n => n.id === selectedId && n.kind === 'fact') && <button onClick={() => setArchiving(true)}>保存到漏洞成果库</button>}
                   </div>
                 )}
                 {view.hints.length > 0 && (
@@ -249,6 +253,7 @@ export function BlackboardPage() {
           )}
         </div>
       </div>
+      {archiving && detail && selectedMeta && selected && selectedId && <ArchiveForm draft={{finding:{title:'',summary:detail.body},source:{source_type:'manual',workspace_id:selected.workspaceId,workspace_path:selectedMeta.workspace.path,owner_session_id:selected.ownerId.replace(/~([0-9A-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))),owner_resolution:'resolved',fact_snapshots:[{id:selectedId,description:detail.body}]}}} onClose={() => setArchiving(false)} onSaved={() => {}} />}
     </section>
   )
 }

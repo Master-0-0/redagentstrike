@@ -217,9 +217,29 @@ cd dsh-cairn-search && npm test
 - 捕获 MVP：**只记录经代理的 HTTP(S)**，且只在 macOS 上实现围栏。
 - 时间线不是 Scope 引擎，也不是全包 / DNS / 连接仓库。
 - 免费公开代理不是生产出口；测活通过也不等于稳定或合法。
-- 「证据」页仍是占位。
 - DeepSeek Harness 处于开发者预览，接口可能不兼容升级。
 
 ## 许可与安全
 
 `deepseek-harness/` 有上游许可证。本工作台只应在授权范围内使用；不要对未授权系统扫描或利用。
+
+
+### 漏洞成果库与证据归档
+
+工作台「漏洞成果库」支持手工新增、证据预览/下载、人工复核、修复状态及审计历史；画板事实详情和 PoC 扫描结果提供归档入口。Cairn 的独立 `archive_finding` 工具支持 create/append/retry，核心画板协议不变。
+
+安装插件并更新已有 Cairn preset 的步骤见 [dsh-findings 安装说明](dsh-findings/README.md)。该步骤会保留用户配置并备份修改文件。成果数据存放在 `WORKBENCH_DATA/findings.sqlite` 与 `findings/`，重启或清理源网络记录不删除已归档证据。测试回执与 UI 验证见 [交付验证记录](docs/verification/findings/README.md)。
+
+#### 默认自动归档
+
+Cairn preset 内的独立归档指引要求每次授权测试加载 `finding-archive`，将已有证据支持的漏洞候选自动保存为待复核成果。探索子代理在原有 JSON fact 的 description 内带回归档 ID，父代理复用该 ID 追加材料；原始搜索协议和完成条件不变。普通进度事实、失败检查及画板完成本身不会当作漏洞。可在任务中明确要求停用自动归档。
+
+PoC 页的「命中后自动归档」默认开启，选择保存在当前浏览器；只对之后启动的扫描生效，每个命中生成待复核卡片。归档模板、扫描输出、已有响应/响应截图和明确的网络事件引用；缺失证据如实标记。模板命中不等于漏洞已确认，最终结论和修复状态仍由人工填写。
+
+PoC 自动归档队列和待提交文件副本保存在当前站点的浏览器 IndexedDB 中，刷新后可从记录中重试；重试复用同一提交，不重复建卡。成功后清除本地材料副本。浏览器存储不可用会明确报错；此时不要关闭页面。刷新后不会无限自动重试，需要点击「重试归档」。不同浏览器或端口不共享队列。Cairn 则使用执行工作区的磁盘 outbox。自动归档验证见 [验证记录](docs/verification/findings-autoarchive/README.md)。
+
+#### 导出成果报告
+
+在「漏洞成果库」点击「手工新增」旁的「导出报告」，搜索并勾选需要的成果，选择 DOCX 或 PDF 后下载。支持跨页保留选择、全选本页和清空选择，单次最多 100 项，合并为一份报告。导出包括漏洞说明、复现步骤、人工复核与修复状态、文本及图片证据、证据索引和缺口。文本正文展示前 64 KiB，超限明确提示；PNG/JPEG 图片嵌入正文。其他附件仍在成果详情中下载，导出不改变状态，也不遮盖保存的凭据。
+
+后端新增依赖 `python-docx` 与 `reportlab`，更新后安装 `backend/pyproject.toml` 中的依赖并重启后端。PDF 嵌入中文 TrueType 字体：macOS 默认读取 `/Library/Fonts/Arial Unicode.ttf`；其他环境可设置 `WORKBENCH_REPORT_FONT`，或使用系统中的文泉驿正黑/宋体。缺少字体时明确报错。DOCX 使用 Arial Unicode MS 字体样式，阅读器可按本机字体替换。

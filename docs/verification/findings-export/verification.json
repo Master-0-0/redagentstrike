@@ -1,0 +1,8 @@
+{
+  "selection_across_pages": true,
+  "docx_download": true,
+  "pdf_download": true,
+  "empty_selection_disabled": true,
+  "failure_preserves_selection": true,
+  "page_errors": []
+}

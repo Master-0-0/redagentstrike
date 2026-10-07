@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import httpx
 
+from .findings import FindingsStore
+from .findings_api import router as findings_router
 from .approval import ApprovalManager
 from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard
 from .config import Settings, load_settings
@@ -147,6 +149,7 @@ class AppState:
         self.settings = settings
         self.control = ControlPlane(settings.control_db)
         self.net = NetStore(settings.net_db)
+        self.findings = FindingsStore(settings, self.net)
         ingest = "http://{}:{}/internal/net/http".format(settings.api_host, settings.api_port)
         self.mitm = MitmManager(settings, ingest_url=ingest)
         self.holds = HoldBoard()
@@ -206,6 +209,7 @@ class AppState:
         return entry
 
     def close(self) -> None:
+        self.findings.close()
         self.poc_recorder.invalidate()
         self.holds.release_all("drop")
         self.mitm.close()
@@ -230,6 +234,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             state.close()
 
     app = FastAPI(title="workbench", lifespan=lifespan)
+    app.include_router(findings_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -770,6 +775,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if event is None:
             raise HTTPException(status_code=404, detail="event_not_found")
         item = event.as_api(include_bodies=True)
+        item["run_id"] = event.run_id
         run = st.control.get_run(event.run_id)
         if run is not None:
             tool_calls = [e for e in st.control.list_events(run.id) if e.kind == "tool_call"]

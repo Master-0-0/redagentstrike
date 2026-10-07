@@ -1,0 +1,18 @@
+{
+  "isError": false,
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"ok\": true,\n  \"submission_key\": \"e1b06685b05c3679feedbe1325bc8002197a806fcd4c46b2c9e8afdc77caed16\",\n  \"finding_id\": \"c1de48669bef4110ae570643ab046168\",\n  \"review_status\": \"pending\",\n  \"saved_artifacts\": 5,\n  \"evidence_gaps\": [],\n  \"warnings\": []\n}"
+    }
+  ],
+  "value": {
+    "ok": true,
+    "submission_key": "e1b06685b05c3679feedbe1325bc8002197a806fcd4c46b2c9e8afdc77caed16",
+    "finding_id": "c1de48669bef4110ae570643ab046168",
+    "review_status": "pending",
+    "saved_artifacts": 5,
+    "evidence_gaps": [],
+    "warnings": []
+  }
+}
