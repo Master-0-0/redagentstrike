@@ -11,6 +11,7 @@ MVP 面向 **macOS 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，
 | Agent 工作台 | iframe 嵌入本地 `dsh web`（默认 `127.0.0.1:3081`） |
 | 画板展示 | 读取 Cairn 搜索会话的 fact-intent 图 |
 | 审批 | 高危 shell 命令进队，人工允许一次或拒绝 |
+| 情报资产库 | 按工作区管理资产、凭据、身份及关联，Cairn 执行期间双向读写 |
 | 证据 | 占位：按 Run 浏览产物（尚未接真数据） |
 | 网络时间线 | 经本地 mitm 的 HTTP(S) 捕获、拦截、重放 |
 | poc 扫描 | 工作台自有 YAML HTTP 模板（不是完整 nuclei） |
@@ -34,6 +35,7 @@ web-ui/                React 壳（Vite）
 deepseek-harness/      DeepSeek Harness 源码（git submodule）
 dsh-cairn-search/      Cairn 搜索：blackboard 工具 + 侧栏图 + cairn preset
 dsh-theme-hacker/      Harness Web 主题
+dsh-intel/             Cairn 独立情报读写工具（query_intel_lib / save_intel）
 .dsh/skills/proxy-pool/        Agent 换 IP 的 skill（启动 API 时复制到 ~/.dsh）
 ```
 
@@ -223,6 +225,12 @@ cd dsh-cairn-search && npm test
 
 `deepseek-harness/` 有上游许可证。本工作台只应在授权范围内使用；不要对未授权系统扫描或利用。
 
+
+### 情报资产库与执行期读写
+
+进入「情报资产库」，左侧选择工作区，顶部切换「资产关联 / 凭证关联 / 身份 / Agent 读写」。支持对象搜索筛选、关联跳转、手工维护、来源历史和执行期间自动更新。工作区绑定执行目录；Cairn 主会话和子代理可以在探索中读取已有资产及凭据，并即时保存新发现，无需等待画板事实或任务结束。
+
+独立 `dsh-intel` 插件仅追加到 Cairn preset，不修改 blackboard、调度、fact、画板协议或终止条件。安装、数据备份、工具契约和边界见 [dsh-intel](dsh-intel/README.md)。存储为 `WORKBENCH_DATA/intel.sqlite` 与 `intel.key`；敏感值按需读取，日志不含原值。当前实现面向本机，不提供远程多用户认证。
 
 ### 漏洞成果库与证据归档
 

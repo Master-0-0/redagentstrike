@@ -11,6 +11,8 @@ import httpx
 
 from .findings import FindingsStore
 from .findings_api import router as findings_router
+from .intel import IntelStore
+from .intel_api import router as intel_router
 from .approval import ApprovalManager
 from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard
 from .config import Settings, load_settings
@@ -150,6 +152,11 @@ class AppState:
         self.control = ControlPlane(settings.control_db)
         self.net = NetStore(settings.net_db)
         self.findings = FindingsStore(settings, self.net)
+        try:
+            self.intel = IntelStore(settings.data_dir)
+        except Exception:
+            # A missing key or damaged intelligence database must not stop Cairn.
+            self.intel = None
         ingest = "http://{}:{}/internal/net/http".format(settings.api_host, settings.api_port)
         self.mitm = MitmManager(settings, ingest_url=ingest)
         self.holds = HoldBoard()
@@ -209,6 +216,8 @@ class AppState:
         return entry
 
     def close(self) -> None:
+        if self.intel is not None:
+            self.intel.close()
         self.findings.close()
         self.poc_recorder.invalidate()
         self.holds.release_all("drop")
@@ -235,6 +244,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     app = FastAPI(title="workbench", lifespan=lifespan)
     app.include_router(findings_router)
+    app.include_router(intel_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],

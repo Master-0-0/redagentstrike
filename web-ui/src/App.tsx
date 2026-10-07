@@ -3,6 +3,7 @@ import { fetchApprovals } from './approval/api'
 import { ApprovalPage } from './approval/ApprovalPage'
 import type { ApprovalPayload } from './approval/types'
 import { FindingsPage } from './findings/FindingsPage'
+import { IntelPage } from './intel/IntelPage'
 import { BlackboardPage } from './blackboard/BlackboardPage'
 import { DSH_URL_EVENT, DEFAULT_DSH_URL, persistDshUrl, readStoredDshUrl } from './dshUrl'
 import { NetworkTimeline } from './network/NetworkTimeline'
@@ -111,7 +112,7 @@ export function App() {
   }
 
   return (
-    <div className="shell">
+    <div className={route === 'intel' ? 'shell shell-intel' : 'shell'}>
       <aside className="rail" aria-label="主导航">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />
@@ -189,7 +190,7 @@ export function App() {
           />
         )}
         {route === 'intel' && (
-          <Placeholder title="情报资产库" detail="主机、域名、账号与情报线索会在这里归档浏览。" />
+          <IntelPage />
         )}
         {route === 'evidence' && (
           <FindingsPage onSource={target => { setSourceBoard(target); setRoute('blackboard') }} />
@@ -252,17 +253,6 @@ function SettingsPanel(props: {
         当前探测：{props.live === 'up' ? '在线' : props.live === 'down' ? '未连接' : '未知'}。
         工作台跑在 <code>127.0.0.1:5173</code>，与 Harness 同站不同端口，iframe 才能带上 Strict Cookie。
       </p>
-    </section>
-  )
-}
-
-function Placeholder(props: { title: string; detail: string }) {
-  return (
-    <section className="page">
-      <header className="page-head">
-        <h1>{props.title}</h1>
-        <p>{props.detail}</p>
-      </header>
     </section>
   )
 }
