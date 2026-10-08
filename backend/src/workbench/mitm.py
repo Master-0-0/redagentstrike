@@ -17,7 +17,7 @@ def addon_path() -> Path:
 
 
 class MitmManager:
-    """Start/stop mitmproxy regular on loopback. macOS MVP only."""
+    """Start/stop mitmproxy regular on loopback. Supported on macOS and Linux."""
 
     def __init__(self, settings: Settings, ingest_url: str) -> None:
         self.settings = settings
@@ -45,7 +45,7 @@ class MitmManager:
 
     def start(self) -> None:
         if not self.settings.capture_supported:
-            self.last_error = "capture_macos_only"
+            self.last_error = "capture_platform_unsupported"
             raise RuntimeError(self.last_error)
         if self.proc is not None and self.proc.poll() is None:
             self.last_error = None
@@ -65,6 +65,7 @@ class MitmManager:
         src_root = Path(__file__).resolve().parents[1]
         env = dict(os.environ)
         env["WORKBENCH_INGEST_URL"] = self.ingest_url
+        env["WORKBENCH_HOST_POLICY"] = str(self.settings.host_policy_path)
         env["WORKBENCH_HOLD_URL"] = self.ingest_url.replace(
             "/internal/net/http", "/internal/net/hold"
         )
@@ -85,6 +86,8 @@ class MitmManager:
             "confdir={}".format(self.settings.mitm_confdir),
             "--set",
             "block_global=false",
+            "--set",
+            "connection_strategy=lazy",
             "-s",
             str(script),
             "--quiet",

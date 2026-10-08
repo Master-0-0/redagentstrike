@@ -1,0 +1,13 @@
+{
+  "finding_id": "386e05f7e6b143d8bf9a9071e2bf12bc",
+  "execution_session": "0104b031-ab04-4394-b612-e2bcfd94a8bb",
+  "owner": "parent",
+  "artifacts": 5,
+  "preset_scoped": true,
+  "default_guidance_in_parent_and_child": true,
+  "subagent_inherits": true,
+  "skill_loaded": true,
+  "installed_bundle_resolved": true,
+  "source_files_deleted": true,
+  "board_unchanged": true
+}

@@ -1,0 +1,131 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 3.11kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm
+#2 DONE 1.6s
+
+#3 [baseline  1/30] FROM docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+#3 resolve docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0 0.0s done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 200.16kB 0.1s
+#4 transferring context: 1.07MB 0.9s done
+#4 DONE 0.9s
+
+#5 [baseline  4/30] WORKDIR /app
+#5 CACHED
+
+#6 [baseline 20/30] RUN test -n "4165dd064531f6444d75abadb47310042e5d5865" && cd deepseek-harness && DSH_CLIENT_COMMIT_HASH="4165dd064531f6444d75abadb47310042e5d5865" pnpm run build
+#6 CACHED
+
+#7 [baseline  7/30] COPY backend/src backend/src
+#7 CACHED
+
+#8 [baseline 16/30] COPY dsh-cairn-search/src dsh-cairn-search/src
+#8 CACHED
+
+#9 [baseline 10/30] COPY backend/pocs backend/pocs
+#9 CACHED
+
+#10 [baseline 21/30] COPY dsh-cairn-search dsh-cairn-search
+#10 CACHED
+
+#11 [baseline 29/30] COPY start.sh stop.sh ./
+#11 CACHED
+
+#12 [baseline 19/30] RUN cd deepseek-harness && pnpm install --frozen-lockfile
+#12 CACHED
+
+#13 [baseline  2/30] RUN apt-get update && apt-get install -y --no-install-recommends     python3 python3-venv python3-dev build-essential procps curl fonts-wqy-zenhei     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [baseline  9/30] COPY backend/dsh backend/dsh
+#14 CACHED
+
+#15 [baseline 25/30] RUN for plugin in dsh-cairn-search dsh-theme-hacker dsh-intel dsh-findings; do       (cd "$plugin" && npm ci && npm run build) || exit; done
+#15 CACHED
+
+#16 [linux-compat 1/5] RUN apt-get update && apt-get install -y --no-install-recommends lsof bubblewrap musl-tools     && rm -rf /var/lib/apt/lists/*
+#16 CACHED
+
+#17 [baseline 14/30] RUN cd web-ui && npm ci
+#17 CACHED
+
+#18 [baseline  6/30] RUN python3 -m venv backend/.venv && python3 -m venv backend/.venv-mitm
+#18 CACHED
+
+#19 [linux-compat 2/5] RUN cd deepseek-harness/native/landlock-run && pnpm run build:native
+#19 CACHED
+
+#20 [baseline 11/30] RUN backend/.venv/bin/pip install -e './backend[dev]' && backend/.venv-mitm/bin/pip install mitmproxy
+#20 CACHED
+
+#21 [baseline 18/30] COPY deepseek-harness deepseek-harness
+#21 CACHED
+
+#22 [baseline 24/30] COPY dsh-findings dsh-findings
+#22 CACHED
+
+#23 [baseline  3/30] RUN npm install -g pnpm@11.7.0
+#23 CACHED
+
+#24 [baseline  8/30] COPY backend/addons backend/addons
+#24 CACHED
+
+#25 [baseline 23/30] COPY dsh-intel dsh-intel
+#25 CACHED
+
+#26 [baseline 22/30] COPY dsh-theme-hacker dsh-theme-hacker
+#26 CACHED
+
+#27 [baseline 28/30] COPY backend/scripts backend/scripts
+#27 CACHED
+
+#28 [baseline 27/30] COPY backend/tests backend/tests
+#28 CACHED
+
+#29 [baseline 12/30] RUN backend/.venv/bin/python -m playwright install --with-deps chromium
+#29 CACHED
+
+#30 [baseline 17/30] RUN cd web-ui && npm run build
+#30 CACHED
+
+#31 [baseline 30/30] COPY docker/linux-compat/run-tests.sh /usr/local/bin/compat-tests
+#31 CACHED
+
+#32 [baseline 15/30] COPY web-ui web-ui
+#32 CACHED
+
+#33 [baseline 13/30] COPY web-ui/package*.json web-ui/
+#33 CACHED
+
+#34 [baseline 26/30] COPY .dsh/skills .dsh/skills
+#34 CACHED
+
+#35 [baseline  5/30] COPY backend/pyproject.toml backend/pyproject.toml
+#35 CACHED
+
+#36 [linux-compat 3/5] RUN cd deepseek-harness && pnpm dsh plugin --profile web add     /app/dsh-cairn-search /app/dsh-theme-hacker /app/dsh-intel /app/dsh-findings
+#36 CACHED
+
+#37 [linux-compat 4/5] RUN mkdir -p /root/.dsh/.agent-presets/cairn     && cp -R dsh-cairn-search/preset/. /root/.dsh/.agent-presets/cairn/     && npm --prefix dsh-cairn-search run link-peers     && npm --prefix dsh-intel run link-peers && npm --prefix dsh-intel run install-preset     && npm --prefix dsh-findings run link-peers && npm --prefix dsh-findings run install-preset
+#37 CACHED
+
+#38 [linux-compat 5/5] COPY docker/linux-compat/*.py docker/linux-compat/*.mjs docker/linux-compat/*.sh /opt/linux-compat/
+#38 DONE 0.5s
+
+#39 exporting to image
+#39 exporting layers 0.0s done
+#39 exporting manifest sha256:851feb02fd3d7fca981e4144057e7f6ab339d1d99a303164be4ebb21149258cd done
+#39 exporting config sha256:6ee709250a502134d9786532afb9f317b1a0113987175efa0f8ef18c9ad13c54 done
+#39 exporting attestation manifest sha256:880bb5b2beb5f7a35563238cf1fbacf3ca04c4f0f1b37047b314adaaac917992 0.0s done
+#39 exporting manifest list sha256:8d7f0fad78bdeb3769f0deedb26dc8e767bd4be202bab9c3aee7924769754b00 done
+#39 naming to docker.io/library/ct-st3-linux-compat:linux-capture done
+#39 unpacking to docker.io/library/ct-st3-linux-compat:linux-capture 0.0s done
+#39 DONE 0.1s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/odn9xxsja5o1v73y1f6nyhz2a

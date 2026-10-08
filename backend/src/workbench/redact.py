@@ -2,42 +2,9 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
-SENSITIVE_HEADERS = {
-    "authorization",
-    "proxy-authorization",
-    "cookie",
-    "set-cookie",
-    "x-api-key",
-    "x-auth-token",
-    "x-access-token",
-    "api-key",
-    "token",
-    "authentication",
-    "x-csrf-token",
-}
-
-SENSITIVE_QUERY = {
-    "token",
-    "access_token",
-    "api_key",
-    "apikey",
-    "password",
-    "auth",
-    "authorization",
-    "secret",
-    "key",
-}
-
-REDACTED = "[redacted]"
 DEFAULT_BODY_LIMIT = 1_000_000
-DEFAULT_HEADER_LIMIT = None
-DEFAULT_URL_LIMIT = 2048
-
-
-def _header_name(name: str) -> str:
-    return name.strip().lower()
 
 
 def plain_headers(headers: Optional[Mapping[str, Any]]) -> Dict[str, str]:
@@ -49,42 +16,6 @@ def plain_headers(headers: Optional[Mapping[str, Any]]) -> Dict[str, str]:
         value = raw_value if isinstance(raw_value, str) else str(raw_value)
         out[name] = value
     return out
-
-
-def redact_headers(
-    headers: Optional[Mapping[str, Any]],
-    value_limit: Optional[int] = DEFAULT_HEADER_LIMIT,
-) -> Dict[str, str]:
-    out: Dict[str, str] = {}
-    if not headers:
-        return out
-    for raw_name, raw_value in headers.items():
-        name = str(raw_name)
-        value = raw_value if isinstance(raw_value, str) else str(raw_value)
-        if _header_name(name) in SENSITIVE_HEADERS:
-            out[name] = REDACTED
-            continue
-        out[name] = _truncate(value, value_limit) if value_limit else value
-    return out
-
-
-def redact_url(url: str, url_limit: int = DEFAULT_URL_LIMIT) -> str:
-    if not url:
-        return ""
-    try:
-        parts = urlsplit(url)
-        query = []
-        for key, value in parse_qsl(parts.query, keep_blank_values=True):
-            if key.lower() in SENSITIVE_QUERY:
-                query.append((key, REDACTED))
-            else:
-                query.append((key, value))
-        rebuilt = urlunsplit(
-            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
-        )
-    except ValueError:
-        rebuilt = url
-    return _truncate(rebuilt, url_limit)
 
 
 def decode_body(body: Optional[Union[bytes, str]]) -> str:

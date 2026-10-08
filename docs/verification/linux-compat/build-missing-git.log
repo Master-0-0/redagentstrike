@@ -1,0 +1,326 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.84kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm
+#2 DONE 1.2s
+
+#3 [ 1/25] FROM docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+#3 resolve docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0 0.0s done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 243.79kB 0.1s
+#4 transferring context: 1.06MB 0.7s done
+#4 DONE 0.7s
+
+#5 [ 5/25] COPY backend/pyproject.toml backend/pyproject.toml
+#5 CACHED
+
+#6 [ 6/25] RUN python3 -m venv backend/.venv && python3 -m venv backend/.venv-mitm
+#6 CACHED
+
+#7 [ 3/25] RUN npm install -g pnpm@11.7.0
+#7 CACHED
+
+#8 [10/25] COPY web-ui/package*.json web-ui/
+#8 CACHED
+
+#9 [ 8/25] RUN backend/.venv/bin/pip install -e './backend[dev]' && backend/.venv-mitm/bin/pip install mitmproxy
+#9 CACHED
+
+#10 [11/25] RUN cd web-ui && npm ci
+#10 CACHED
+
+#11 [ 4/25] WORKDIR /app
+#11 CACHED
+
+#12 [ 2/25] RUN apt-get update && apt-get install -y --no-install-recommends     python3 python3-venv python3-dev build-essential procps curl fonts-wqy-zenhei     && rm -rf /var/lib/apt/lists/*
+#12 CACHED
+
+#13 [ 7/25] COPY backend backend
+#13 CACHED
+
+#14 [ 9/25] RUN backend/.venv/bin/python -m playwright install --with-deps chromium
+#14 CACHED
+
+#15 [12/25] COPY web-ui web-ui
+#15 CACHED
+
+#16 [13/25] COPY dsh-cairn-search/src dsh-cairn-search/src
+#16 DONE 0.0s
+
+#17 [14/25] RUN cd web-ui && npm run build
+#17 0.174
+#17 0.174 > agent-workbench@0.1.0 build
+#17 0.174 > tsc -b && vite build
+#17 0.174
+#17 2.760 vite v7.3.6 building client environment for production...
+#17 2.801 transforming...
+#17 3.473 ✓ 55 modules transformed.
+#17 3.584 rendering chunks...
+#17 3.593 computing gzip size...
+#17 3.605 dist/index.html                   0.41 kB │ gzip:   0.30 kB
+#17 3.605 dist/assets/index-CCtnW_v-.css   43.17 kB │ gzip:   9.00 kB
+#17 3.606 dist/assets/index-XG-It1WE.js   330.37 kB │ gzip: 102.37 kB
+#17 3.607 ✓ built in 828ms
+#17 DONE 3.6s
+
+#18 [15/25] COPY deepseek-harness deepseek-harness
+#18 DONE 1.0s
+
+#19 [16/25] RUN cd deepseek-harness && pnpm install --frozen-lockfile
+#19 0.661 native/landlock-run/packages/linux-x64   | [WARN] Unsupported platform: wanted: {"cpu":["x64"],"os":["linux"],"libc":["any"]} (current: {"os":"linux","cpu":"arm64","libc":"glibc"})
+#19 0.767 Scope: all 285 workspace projects
+#19 0.801 [WARN] There are cyclic workspace dependencies: /app/deepseek-harness/packages/api/gateway, /app/deepseek-harness/packages/client/connection, /app/deepseek-harness/packages/api/session-controller, /app/deepseek-harness/packages/client/file-upload, /app/deepseek-harness/packages/api/remotes, /app/deepseek-harness/packages/api/workspace-controller; /app/deepseek-harness/packages/api/workspace-files, /app/deepseek-harness/packages/client/resources, /app/deepseek-harness/packages/test-support/client-runtime, /app/deepseek-harness/packages/client/ui-chat, /app/deepseek-harness/packages/client/ui-sidebar-textpreview; /app/deepseek-harness/packages/client/ui-conversation, /app/deepseek-harness/packages/client/ui-workspace; /app/deepseek-harness/packages/e2b/e2b, /app/deepseek-harness/packages/e2b/fs-e2b; /app/deepseek-harness/packages/llm/llm-deepseek, /app/deepseek-harness/packages/session/session-log-deepseek; /app/deepseek-harness/packages/sandbox/sandbox-local, /app/deepseek-harness/packages/sandbox/sandbox-windows-acl; /app/deepseek-harness/packages/subagent/subagent-spawn-in-process, /app/deepseek-harness/packages/subagent/tool-subagent; /app/deepseek-harness/vendor/cordis, /app/deepseek-harness/vendor/include
+#19 0.944 ? Verifying lockfile against supply-chain policies (1532 entries)...
+#19 1.033 Lockfile is up to date, resolution step is skipped
+#19 1.120 Progress: resolved 1, reused 0, downloaded 0, added 0
+#19 1.229 Packages: +1263
+#19 1.229 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#19 2.001
+#19 2.001    ╭──────────────────────────────────────────╮
+#19 2.001    │                                          │
+#19 2.001    │   Update available! 11.7.0 → 12.10.1.    │
+#19 2.001    │   Changelog: https://pnpm.io/v/12.10.1   │
+#19 2.001    │     To update, run: pnpm add -g pnpm     │
+#19 2.001    │                                          │
+#19 2.001    ╰──────────────────────────────────────────╯
+#19 2.001
+#19 2.122 Progress: resolved 1263, reused 0, downloaded 35, added 32
+#19 3.127 Progress: resolved 1263, reused 0, downloaded 137, added 137
+#19 4.131 Progress: resolved 1263, reused 0, downloaded 203, added 208
+#19 4.594 [WARN] Tarball download average speed 4 KiB/s (size 6 KiB) is below 50 KiB/s: https://registry.npmjs.org/std-env/-/std-env-4.1.0.tgz (GET)
+#19 5.133 Progress: resolved 1263, reused 0, downloaded 313, added 318
+#19 6.133 Progress: resolved 1263, reused 0, downloaded 410, added 415
+#19 7.134 Progress: resolved 1263, reused 0, downloaded 469, added 474
+#19 8.120 [WARN] Tarball download average speed 21 KiB/s (size 25 KiB) is below 50 KiB/s: https://registry.npmjs.org/d3-delaunay/-/d3-delaunay-6.0.4.tgz (GET)
+#19 8.134 Progress: resolved 1263, reused 0, downloaded 522, added 527
+#19 9.135 Progress: resolved 1263, reused 0, downloaded 564, added 569
+#19 10.14 Progress: resolved 1263, reused 0, downloaded 565, added 570
+#19 11.27 Progress: resolved 1263, reused 0, downloaded 566, added 570
+#19 11.33 [WARN] Tarball download average speed 4 KiB/s (size 12 KiB) is below 50 KiB/s: https://registry.npmjs.org/lodash.isequal/-/lodash.isequal-4.5.0.tgz (GET)
+#19 11.35 [WARN] Tarball download average speed 44 KiB/s (size 186 KiB) is below 50 KiB/s: https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.6.3.tgz (GET)
+#19 12.27 Progress: resolved 1263, reused 0, downloaded 628, added 633
+#19 13.28 Progress: resolved 1263, reused 0, downloaded 751, added 756
+#19 14.27 Progress: resolved 1263, reused 0, downloaded 828, added 833
+#19 15.28 Progress: resolved 1263, reused 0, downloaded 889, added 894
+#19 16.28 Progress: resolved 1263, reused 0, downloaded 941, added 945
+#19 17.28 Progress: resolved 1263, reused 0, downloaded 1042, added 1047
+#19 18.28 Progress: resolved 1263, reused 0, downloaded 1060, added 1065
+#19 19.28 Progress: resolved 1263, reused 0, downloaded 1067, added 1072
+#19 20.28 Progress: resolved 1263, reused 0, downloaded 1142, added 1147
+#19 21.28 Progress: resolved 1263, reused 0, downloaded 1189, added 1194
+#19 22.28 Progress: resolved 1263, reused 0, downloaded 1246, added 1251
+#19 23.28 Progress: resolved 1263, reused 0, downloaded 1247, added 1252
+#19 24.28 Progress: resolved 1263, reused 0, downloaded 1251, added 1256
+#19 25.30 Progress: resolved 1263, reused 0, downloaded 1253, added 1258
+#19 26.31 Progress: resolved 1263, reused 0, downloaded 1255, added 1260
+#19 28.23 Progress: resolved 1263, reused 0, downloaded 1256, added 1260
+#19 29.23 Progress: resolved 1263, reused 0, downloaded 1256, added 1261
+#19 29.57 ✓ Lockfile passes supply-chain policies (1532 entries in 28.6s)
+#19 35.84 Progress: resolved 1263, reused 0, downloaded 1257, added 1261
+#19 36.50 Progress: resolved 1263, reused 0, downloaded 1258, added 1263, done
+#19 37.60 .../.pnpm/koffi@3.1.1/node_modules/koffi install$ node ./cnoke.cjs -P . -D src/koffi --prebuild --release
+#19 37.65 .../fs-ext@2.1.1/node_modules/fs-ext install$ node-gyp configure build
+#19 37.67 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#19 37.71 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+#19 37.74 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info it worked if it ends with ok
+#19 37.74 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info using node-gyp@12.4.0
+#19 37.74 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info using node@24.21.0 | linux | arm64
+#19 37.74 .../.pnpm/koffi@3.1.1/node_modules/koffi install: Done
+#19 37.74 .../lefthook@2.1.9/node_modules/lefthook postinstall$ node postinstall.js
+#19 37.77 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#19 37.81 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+#19 37.83 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info find Python using Python version 3.11.2 found at "/usr/bin/python3"
+#19 37.84 .../node_modules/node-pty install$ node scripts/prebuild.js || node-gyp rebuild
+#19 37.87 .../esbuild@0.21.5/node_modules/esbuild postinstall$ node install.js
+#19 37.92 .../lefthook@2.1.9/node_modules/lefthook postinstall: │  > git rev-parse --path-format=absolute --show-toplevel --git-path hooks --git-path info --git-dir
+#19 37.92 .../lefthook@2.1.9/node_modules/lefthook postinstall: │    fatal: not a git repository (or any of the parent directories): .git
+#19 37.92 .../lefthook@2.1.9/node_modules/lefthook postinstall: │
+#19 37.92 .../lefthook@2.1.9/node_modules/lefthook postinstall: exit status 128
+#19 37.92 .../node_modules/node-pty install: > Checking prebuilds...
+#19 37.93 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp http GET https://nodejs.org/download/release/v24.21.0/node-v24.21.0-headers.tar.gz
+#19 37.93 .../node_modules/node-pty install: Done
+#19 37.93 .../lefthook@2.1.9/node_modules/lefthook postinstall: Done
+#19 37.93 .../node_modules/node-pty postinstall$ node scripts/post-install.js
+#19 37.95 .../esbuild@0.21.5/node_modules/esbuild postinstall: Done
+#19 37.97 .../node_modules/node-pty postinstall: > Cleaning release folder...
+#19 37.97 .../node_modules/node-pty postinstall: > Moving conpty.dll...
+#19 37.97 .../node_modules/node-pty postinstall:   SKIPPED (not Windows)
+#19 37.97 .../node_modules/node-pty postinstall: Done
+#19 38.38 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp http 200 https://nodejs.org/download/release/v24.21.0/node-v24.21.0-headers.tar.gz
+#19 42.51 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp http GET https://nodejs.org/download/release/v24.21.0/SHASUMS256.txt
+#19 42.97 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp http 200 https://nodejs.org/download/release/v24.21.0/SHASUMS256.txt
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn /usr/bin/python3
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args [
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/gyp/gyp_main.py',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args 'binding.gyp',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-f',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args 'make',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-I',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '/app/deepseek-harness/node_modules/.pnpm/fs-ext@2.1.1/node_modules/fs-ext/build/config.gypi',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-I',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp/addon.gypi',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-I',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '/root/.cache/node-gyp/24.21.0/include/node/common.gypi',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dlibrary=shared_library',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dvisibility=default',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dnode_root_dir=/root/.cache/node-gyp/24.21.0',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dnode_gyp_dir=/usr/local/lib/node_modules/pnpm/dist/node_modules/node-gyp',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dnode_lib_file=/root/.cache/node-gyp/24.21.0/<(target_arch)/node.lib',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dmodule_root_dir=/app/deepseek-harness/node_modules/.pnpm/fs-ext@2.1.1/node_modules/fs-ext',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Dnode_engine=v8',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '--depth=.',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '--no-parallel',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '--generator-output',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args 'build',
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args '-Goutput_dir=.'
+#19 43.91 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args ]
+#19 44.16 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn make
+#19 44.16 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info spawn args [ 'BUILDTYPE=Release', '-C', 'build' ]
+#19 44.16 .../fs-ext@2.1.1/node_modules/fs-ext install: make: Entering directory '/app/deepseek-harness/node_modules/.pnpm/fs-ext@2.1.1/node_modules/fs-ext/build'
+#19 44.16 .../fs-ext@2.1.1/node_modules/fs-ext install:   CXX(target) Release/obj.target/fs_ext/fs-ext.o
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc: In function 'Nan::NAN_METHOD_RETURN_TYPE Flock(Nan::NAN_METHOD_ARGS_TYPE)':
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc:357:54: warning: cast between incompatible function types from 'void (*)(uv_work_t*)' {aka 'void (*)(uv_work_s*)'} to 'uv_after_work_cb' {aka 'void (*)(uv_work_s*, int)'} [-Wcast-function-type]
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install:   357 |     uv_queue_work(uv_default_loop(), req, EIO_Flock, (uv_after_work_cb)EIO_After);
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install:       |                                                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc: In function 'Nan::NAN_METHOD_RETURN_TYPE Seek(Nan::NAN_METHOD_ARGS_TYPE)':
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc:427:51: warning: cast between incompatible function types from 'void (*)(uv_work_t*)' {aka 'void (*)(uv_work_s*)'} to 'uv_after_work_cb' {aka 'void (*)(uv_work_s*, int)'} [-Wcast-function-type]
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install:   427 |   uv_queue_work(uv_default_loop(), req, EIO_Seek, (uv_after_work_cb)EIO_After);
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install:       |                                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc: In function 'Nan::NAN_METHOD_RETURN_TYPE Fcntl(Nan::NAN_METHOD_ARGS_TYPE)':
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc:464:52: warning: cast between incompatible function types from 'void (*)(uv_work_t*)' {aka 'void (*)(uv_work_s*)'} to 'uv_after_work_cb' {aka 'void (*)(uv_work_s*, int)'} [-Wcast-function-type]
+#19 45.00 .../fs-ext@2.1.1/node_modules/fs-ext install:   464 |   uv_queue_work(uv_default_loop(), req, EIO_Fcntl, (uv_after_work_cb)EIO_After);
+#19 45.01 .../fs-ext@2.1.1/node_modules/fs-ext install:       |                                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.01 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc: In function 'Nan::NAN_METHOD_RETURN_TYPE StatVFS(Nan::NAN_METHOD_ARGS_TYPE)':
+#19 45.01 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc:514:53: warning: cast between incompatible function types from 'void (*)(uv_work_t*)' {aka 'void (*)(uv_work_s*)'} to 'uv_after_work_cb' {aka 'void (*)(uv_work_s*, int)'} [-Wcast-function-type]
+#19 45.01 .../fs-ext@2.1.1/node_modules/fs-ext install:   514 |   uv_queue_work(uv_default_loop(), req, EIO_StatVFS,(uv_after_work_cb)EIO_After);
+#19 45.01 .../fs-ext@2.1.1/node_modules/fs-ext install:       |                                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: In file included from ../fs-ext.cc:20:
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc: At global scope:
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: /root/.cache/node-gyp/24.21.0/include/node/node.h:1394:7: warning: cast between incompatible function types from 'void (*)(v8::Local<v8::Object>, v8::Local<v8::Value>, v8::Local<v8::Context>)' to 'node::addon_context_register_func' {aka 'void (*)(v8::Local<v8::Object>, v8::Local<v8::Value>, v8::Local<v8::Context>, void*)'} [-Wcast-function-type]
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:  1394 |       (node::addon_context_register_func) (regfunc),                  \
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: /root/.cache/node-gyp/24.21.0/include/node/node.h:1412:3: note: in expansion of macro 'NODE_MODULE_CONTEXT_AWARE_X'
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:  1412 |   NODE_MODULE_CONTEXT_AWARE_X(modname, regfunc, NULL, 0)
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:       |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: /root/.cache/node-gyp/24.21.0/include/node/node.h:1443:3: note: in expansion of macro 'NODE_MODULE_CONTEXT_AWARE'
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:  1443 |   NODE_MODULE_CONTEXT_AWARE(NODE_GYP_MODULE_NAME,                     \
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:       |   ^~~~~~~~~~~~~~~~~~~~~~~~~
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install: ../fs-ext.cc:619:3: note: in expansion of macro 'NODE_MODULE_INIT'
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:   619 |   NODE_MODULE_INIT() {
+#19 45.02 .../fs-ext@2.1.1/node_modules/fs-ext install:       |   ^~~~~~~~~~~~~~~~
+#19 45.44 .../fs-ext@2.1.1/node_modules/fs-ext install:   SOLINK_MODULE(target) Release/obj.target/fs_ext.node
+#19 45.49 .../fs-ext@2.1.1/node_modules/fs-ext install:   COPY Release/fs_ext.node
+#19 45.49 .../fs-ext@2.1.1/node_modules/fs-ext install: make: Leaving directory '/app/deepseek-harness/node_modules/.pnpm/fs-ext@2.1.1/node_modules/fs-ext/build'
+#19 45.50 .../fs-ext@2.1.1/node_modules/fs-ext install: gyp info ok
+#19 45.51 .../fs-ext@2.1.1/node_modules/fs-ext install: Done
+#19 45.73 [WARN] Failed to create bin at /app/deepseek-harness/apps/desktop-host/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/apps/cli/lib/bin.js'
+#19 46.10 [WARN] Failed to create bin at /app/deepseek-harness/packages/sdk/client/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/apps/cli/lib/bin.js'
+#19 46.28 [WARN] Failed to create bin at /app/deepseek-harness/python/sdk-runtime/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/apps/cli/lib/bin.js'
+#19 46.52
+#19 46.52 devDependencies:
+#19 46.52 + @deepseek-ai/dsh-agent 0.1.3-alpha.2 <- packages/core/agent
+#19 46.52 + @deepseek-ai/dsh-package-manifest 0.1.3-alpha.2 <- packages/util/package-manifest
+#19 46.52 + @deepseek-ai/dsh-tool-session-query 0.1.3-alpha.2 <- packages/session-query/tool-session-query
+#19 46.52 + @deepseek-ai/dsh-web-fetch-http 0.1.3-alpha.2 <- packages/web/web-fetch-http
+#19 46.52 + @stylistic/eslint-plugin 5.10.0
+#19 46.52 + @testing-library/dom 10.4.1
+#19 46.52 + @testing-library/react 16.3.2
+#19 46.52 + @types/js-yaml 4.0.9
+#19 46.52 + @types/jsdom 28.0.3
+#19 46.52 + @types/mdast 4.0.4
+#19 46.52 + @types/node 22.20.0
+#19 46.52 + @types/spdx-expression-parse 4.0.0
+#19 46.52 + @vitest/coverage-v8 4.1.8
+#19 46.52 + @yao-pkg/pkg 6.21.0
+#19 46.52 + @yarnpkg/cli-dist 4.17.1
+#19 46.52 + eslint-plugin-sonarjs 4.1.0
+#19 46.52 + execa 10.0.0
+#19 46.52 + fast-check 4.8.0
+#19 46.52 + istanbul-lib-report 3.0.1
+#19 46.52 + js-yaml 4.2.0
+#19 46.52 + jscpd 5.0.12
+#19 46.52 + jsdom 29.1.1
+#19 46.52 + lefthook 2.1.9
+#19 46.52 + lightningcss 1.32.0
+#19 46.52 + mdast-util-from-markdown 2.0.3
+#19 46.52 + mdast-util-gfm 3.1.0
+#19 46.52 + mermaid 11.16.0
+#19 46.52 + micromark-extension-gfm 3.0.0
+#19 46.52 + oxlint 1.76.0
+#19 46.52 + oxlint-tsgolint 7.0.2001
+#19 46.52 + publint 0.3.21
+#19 46.52 + smol-toml 1.7.1
+#19 46.52 + spdx-expression-parse 5.0.0
+#19 46.52 + tsdown 0.22.2
+#19 46.52 + tsx 4.22.4
+#19 46.52 + typescript 6.0.3
+#19 46.52 + vite-tsconfig-paths 6.1.1
+#19 46.52 + vitest 4.1.8
+#19 46.52
+#19 46.84 packages/subprocess/subprocess-local postinstall$ node scripts/ensure-spawn-helper.mjs
+#19 46.89 packages/subprocess/subprocess-local postinstall: Done
+#19 47.16 . postinstall$ node scripts/install-lefthook.mjs
+#19 47.22 . postinstall: Done
+#19 47.30 [WARN] Failed to create bin at /app/deepseek-harness/apps/desktop-host/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/apps/desktop-host/node_modules/@deepseek-ai/dsh/lib/bin.js'
+#19 47.30 [WARN] Failed to create bin at /app/deepseek-harness/packages/sdk/client/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/packages/sdk/client/node_modules/@deepseek-ai/dsh/lib/bin.js'
+#19 47.31 [WARN] Failed to create bin at /app/deepseek-harness/python/sdk-runtime/node_modules/.bin/dsh. ENOENT: no such file or directory, open '/app/deepseek-harness/python/sdk-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js'
+#19 47.42 Done in 47.2s using pnpm v11.7.0
+#19 DONE 47.9s
+
+#20 [17/25] RUN cd deepseek-harness && pnpm run build
+#20 2.215 $ tsx scripts/build.ts
+#20 2.410 node:internal/errors:986
+#20 2.410   const err = new Error(message);
+#20 2.410               ^
+#20 2.410
+#20 2.410 Error: Command failed: git rev-parse HEAD
+#20 2.410     at genericNodeError (node:internal/errors:986:15)
+#20 2.410     at wrappedFn (node:internal/errors:540:14)
+#20 2.410     at checkExecSyncError (node:child_process:942:11)
+#20 2.410     at execFileSync (node:child_process:978:15)
+#20 2.410     at repositoryCommitHash (/app/deepseek-harness/scripts/client-build-environment.ts:52:29)
+#20 2.410     at repositoryClientBuildEnvironment (/app/deepseek-harness/scripts/client-build-environment.ts:127:29)
+#20 2.410     at main (/app/deepseek-harness/scripts/build.ts:38:33)
+#20 2.410     at <anonymous> (/app/deepseek-harness/scripts/build.ts:52:23)
+#20 2.410     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+#20 2.410     at async node:internal/modules/esm/loader:647:26 {
+#20 2.410   status: 128,
+#20 2.410   signal: null,
+#20 2.410   output: [ null, '', null ],
+#20 2.410   pid: 58,
+#20 2.410   stdout: '',
+#20 2.410   stderr: null
+#20 2.410 }
+#20 2.410
+#20 2.410 Node.js v24.21.0
+#20 2.440 [ELIFECYCLE] Command failed with exit code 1.
+#20 ERROR: process "/bin/sh -c cd deepseek-harness && pnpm run build" did not complete successfully: exit code: 1
+------
+ > [17/25] RUN cd deepseek-harness && pnpm run build:
+2.410   status: 128,
+2.410   signal: null,
+2.410   output: [ null, '', null ],
+2.410   pid: 58,
+2.410   stdout: '',
+2.410   stderr: null
+2.410 }
+2.410
+2.410 Node.js v24.21.0
+2.440 [ELIFECYCLE] Command failed with exit code 1.
+------
+Dockerfile:21
+--------------------
+  19 |     COPY deepseek-harness deepseek-harness
+  20 |     RUN cd deepseek-harness && pnpm install --frozen-lockfile
+  21 | >>> RUN cd deepseek-harness && pnpm run build
+  22 |     COPY dsh-cairn-search dsh-cairn-search
+  23 |     COPY dsh-theme-hacker dsh-theme-hacker
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c cd deepseek-harness && pnpm run build" did not complete successfully: exit code: 1
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/mafa4k1gftcfo8y2citnsbu43

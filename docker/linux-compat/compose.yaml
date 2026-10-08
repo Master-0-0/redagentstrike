@@ -1,0 +1,25 @@
+services:
+  workbench:
+    image: ct-st3-linux-compat:debian12
+    container_name: ct-st3-linux-workbench
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 100s
+    command: ["python", "/opt/linux-compat/serve.py"]
+    ports:
+      - "127.0.0.1:5173:15173"
+      - "127.0.0.1:3081:13081"
+      - "127.0.0.1:8787:18787"
+    volumes:
+      - ./serve.py:/opt/linux-compat/serve.py:ro
+      - workbench-data:/app/backend/data
+      - harness-home:/root/.dsh
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:15173/api/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+volumes:
+  workbench-data:
+  harness-home:

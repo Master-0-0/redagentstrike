@@ -1,0 +1,17 @@
+
+> dsh-findings@0.1.0 test
+> node --test --experimental-strip-types tests/*.test.ts
+
+✔ stable keys, explicit occurrences, and retry after original deletion (63.944875ms)
+✔ source parent chain, fork, unresolved parent and fact snapshots (19.123208ms)
+✔ reject traversal, symlinks (including ancestor), FIFO and oversized files (32.644375ms)
+✔ failed service returns persisted key, retry streams old copy and saves receipt (63.636208ms)
+✔ loopback endpoint only and bounded timeout (210.751583ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 489.942416

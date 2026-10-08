@@ -1,24 +1,4 @@
-from workbench.redact import decode_body, plain_headers, redact_headers, redact_url, truncate_body
-
-
-def test_redacts_authorization_and_cookie():
-    out = redact_headers(
-        {
-            "Authorization": "Bearer secret-token",
-            "Cookie": "sid=abc",
-            "Content-Type": "application/json",
-        }
-    )
-    assert out["Authorization"] == "[redacted]"
-    assert out["Cookie"] == "[redacted]"
-    assert out["Content-Type"] == "application/json"
-
-
-def test_redacts_query_token():
-    url = redact_url("https://api.example.com/v1?token=supersecret&q=1")
-    assert "supersecret" not in url
-    assert "token=%5Bredacted%5D" in url or "token=[redacted]" in url
-    assert "q=1" in url
+from workbench.redact import decode_body, plain_headers, truncate_body
 
 
 def test_truncates_and_marks_binary():

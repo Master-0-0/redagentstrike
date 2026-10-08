@@ -24,6 +24,13 @@ READY_RE = re.compile(
 )
 
 
+LSOF_NOT_FOUND = "Error: required tool lsof not found"
+
+
+class RequiredToolNotFound(RuntimeError):
+    """A required process-inspection tool is unavailable."""
+
+
 def parse_ready_url(text: str) -> Optional[str]:
     matches = READY_RE.findall(text)
     return matches[-1] if matches else None
@@ -37,9 +44,13 @@ class HarnessManager:
         self.last_error: Optional[str] = None
         self._injected = False
         self._log_handle = None
+        self._log_start = 0
 
     def status(self) -> dict:
-        pid = self._listen_pid()
+        try:
+            pid = self._listen_pid()
+        except RequiredToolNotFound:
+            pid = None
         proxied = self._pid_is_proxied(pid) if pid else False
         if pid:
             found = self._url_from_log()
@@ -74,6 +85,16 @@ class HarnessManager:
         self.last_error = None
 
     def close(self) -> None:
+        if self.settings.manage_dsh and os.environ.get("WORKBENCH_STOP_DSH_ON_EXIT") == "1":
+            try:
+                self._stop_listener()
+            except RequiredToolNotFound:
+                # An owned process was already stopped; port discovery is unavailable.
+                pass
+            finally:
+                self._injected = False
+                self._close_log()
+            return
         if self._injected:
             try:
                 self.apply(False)
@@ -94,6 +115,7 @@ class HarnessManager:
         self.settings.data_dir.mkdir(parents=True, exist_ok=True)
         self._close_log()
         self._log_handle = open(log_path, "ab")
+        self._log_start = self._log_handle.tell()
         try:
             self.proc = subprocess.Popen(
                 cmd,
@@ -118,12 +140,12 @@ class HarnessManager:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self.proc is not None and self.proc.poll() is not None:
-                return parse_ready_url(_tail(log_path, 8000))
-            found = parse_ready_url(_tail(log_path, 8000))
+                return None
+            found = parse_ready_url(_tail(log_path, 8000, start=self._log_start))
             if found and _port_open(self.settings.dsh_host, self.settings.dsh_port):
                 return found
             time.sleep(0.2)
-        return parse_ready_url(_tail(log_path, 8000))
+        return None
 
     def _url_from_log(self) -> Optional[str]:
         return parse_ready_url(_tail(self.settings.data_dir / "dsh-web.log", 8000))
@@ -148,7 +170,14 @@ class HarnessManager:
         self._close_log()
 
     def _listen_pid(self) -> Optional[int]:
-        return _listen_pid(self.settings.dsh_port)
+        try:
+            pid = _listen_pid(self.settings.dsh_port)
+        except RequiredToolNotFound as exc:
+            self.last_error = str(exc)
+            raise
+        if self.last_error == LSOF_NOT_FOUND:
+            self.last_error = None
+        return pid
 
     def _pid_is_proxied(self, pid: int) -> bool:
         blob = _process_command_env(pid)
@@ -204,12 +233,17 @@ def _dsh_cmd(settings: Settings) -> List[str]:
 
 
 def _listen_pid(port: int) -> Optional[int]:
+    binary = shutil.which("lsof")
+    if binary is None:
+        raise RequiredToolNotFound(LSOF_NOT_FOUND)
     try:
         out = subprocess.check_output(
-            ["lsof", "-nP", "-iTCP:{}".format(port), "-sTCP:LISTEN"],
+            [binary, "-nP", "-iTCP:{}".format(port), "-sTCP:LISTEN"],
             text=True,
             stderr=subprocess.DEVNULL,
         )
+    except FileNotFoundError as exc:
+        raise RequiredToolNotFound(LSOF_NOT_FOUND) from exc
     except (OSError, subprocess.CalledProcessError):
         return None
     for line in out.splitlines()[1:]:
@@ -277,9 +311,12 @@ def _port_open(host: str, port: int) -> bool:
         sock.close()
 
 
-def _tail(path: Path, limit: int = 4000) -> str:
+def _tail(path: Path, limit: int = 4000, start: int = 0) -> str:
     try:
-        data = path.read_bytes()[-limit:]
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(start, handle.tell() - limit))
+            data = handle.read()
     except OSError:
         return ""
     return data.decode("utf-8", errors="replace")

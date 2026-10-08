@@ -1,0 +1,3 @@
+start_exit=0
+PASS: API, UI, Vite API proxy, Harness HTTP and Chromium UI rendering are available.
+PASS: all three service ports closed after stop.

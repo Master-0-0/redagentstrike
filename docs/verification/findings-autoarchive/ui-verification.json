@@ -1,0 +1,15 @@
+{
+  "default_on": true,
+  "opt_out_persists": true,
+  "no_retroactive_upload": true,
+  "matched_only": true,
+  "no_manual_form": true,
+  "pending_review": true,
+  "explicit_gaps": true,
+  "navigation_preserves_queue": true,
+  "reload_retry_same_key": true,
+  "lost_commit_receipt_idempotent": true,
+  "no_source_reread_on_retry": true,
+  "success_clears_local_evidence": true,
+  "page_errors": []
+}

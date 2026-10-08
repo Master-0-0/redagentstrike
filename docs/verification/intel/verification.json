@@ -1,0 +1,25 @@
+{
+  "harness": {
+    "preset_scoped": true,
+    "inherited_by_child": true,
+    "skill_loaded": true,
+    "child_save_parent_query": true,
+    "explicit_secret_read": true,
+    "board_unchanged": true
+  },
+  "ui": {
+    "workspace_isolation": true,
+    "navigation": true,
+    "linked_navigation": true,
+    "explicit_secret_reveal": true,
+    "manual_edit": true,
+    "manual_create": true,
+    "relationship_create": true,
+    "live_update_preserves_selection": true,
+    "outage_preserves_rows": true,
+    "empty_search": true,
+    "audit_without_secrets": true,
+    "mobile_no_overflow": true,
+    "page_errors": []
+  }
+}

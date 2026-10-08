@@ -1,0 +1,1 @@
+PASS: native HTTP/HTTPS capture; intercept/edit/forward/drop; replay; stop/restart; Chromium screenshot. No platform override.

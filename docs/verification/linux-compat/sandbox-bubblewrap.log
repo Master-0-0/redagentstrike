@@ -1,0 +1,15 @@
+{"launcher":"/app/deepseek-harness/native/landlock-run/packages/linux-arm64/bin/landlock-run","exists":false,"probe":"unusable"}
+file:///app/deepseek-harness/packages/sandbox/sandbox-local/lib/index.js:479
+		if (this.selectedRunner === "unavailable") throw new SandboxUnavailableError(mode);
+		                                                 ^
+
+SandboxUnavailableError: sandbox mode "read-only" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined. Install bubblewrap or run a Landlock-enforcing kernel (Linux), ensure sandbox-exec is usable (macOS), or ensure the ACL restricted-token runner can start (Windows) — otherwise switch the consumer to danger-full-access.
+    at Proxy.selectRunner (file:///app/deepseek-harness/packages/sandbox/sandbox-local/lib/index.js:479:52)
+    at Object.apply (file:///app/deepseek-harness/vendor/cordis/lib/index.js:120:36)
+    at Proxy.confine (file:///app/deepseek-harness/packages/sandbox/sandbox-local/lib/index.js:310:25)
+    at Object.apply (file:///app/deepseek-harness/vendor/cordis/lib/index.js:120:36)
+    at file:///compat/sandbox-smoke.mjs:18:34 {
+  code: 'SANDBOX_UNAVAILABLE'
+}
+
+Node.js v24.21.0

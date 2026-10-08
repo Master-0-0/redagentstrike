@@ -1,0 +1,6 @@
+{
+  "platform": "linux",
+  "capture_supported": true,
+  "capture_enable": "passed",
+  "capture_disable": "passed"
+}

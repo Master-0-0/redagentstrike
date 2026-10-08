@@ -2,7 +2,7 @@
 
 单机渗透测试 Agent 工作台：把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 嵌进侧栏，并补上审批、画板、HTTP 网络时间线、PoC 扫描和出口代理池。
 
-MVP 面向 **macOS 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，不是多用户远程产品。仅在你有权测试的环境上使用。
+MVP 面向 **macOS / Linux 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，不是多用户远程产品。仅在你有权测试的环境上使用。
 
 ## 它做什么
 
@@ -11,6 +11,7 @@ MVP 面向 **macOS 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，
 | Agent 工作台 | iframe 嵌入本地 `dsh web`（默认 `127.0.0.1:3081`） |
 | 画板展示 | 读取 Cairn 搜索会话的 fact-intent 图 |
 | 审批 | 高危 shell 命令进队，人工允许一次或拒绝 |
+| 情报资产库 | 按工作区管理资产、凭据、身份及关联，Cairn 执行期间双向读写 |
 | 证据 | 占位：按 Run 浏览产物（尚未接真数据） |
 | 网络时间线 | 经本地 mitm 的 HTTP(S) 捕获、拦截、重放 |
 | poc 扫描 | 工作台自有 YAML HTTP 模板（不是完整 nuclei） |
@@ -34,6 +35,7 @@ web-ui/                React 壳（Vite）
 deepseek-harness/      DeepSeek Harness 源码（git submodule）
 dsh-cairn-search/      Cairn 搜索：blackboard 工具 + 侧栏图 + cairn preset
 dsh-theme-hacker/      Harness Web 主题
+dsh-intel/             Cairn 独立情报读写工具（query_intel_lib / save_intel）
 .dsh/skills/proxy-pool/        Agent 换 IP 的 skill（启动 API 时复制到 ~/.dsh）
 ```
 
@@ -41,7 +43,7 @@ dsh-theme-hacker/      Harness Web 主题
 
 ## 环境要求
 
-- macOS（网络捕获仅 darwin；其它平台 API 可起，捕获会报 `capture_macos_only`）
+- macOS 或 Linux（网络捕获需要 mitmdump；其他平台返回 `capture_platform_unsupported`）
 - Python 3.9+
 - Node.js `^22.19` 或 `>=24`，以及 [pnpm](https://pnpm.io/) 11.x
 - 可选：`mitmdump`（捕获）、Docker（Nacos 靶场）、Chromium（PoC 命中截图）
@@ -119,6 +121,19 @@ cd ..
 ```
 
 ### 6. 启动
+
+完成上述首次安装后，可直接运行根目录的启停脚本：
+
+```sh
+./start.sh
+./stop.sh
+```
+
+`start.sh` 后台启动后端与前端，等待健康检查通过后打印访问地址；关闭终端后服务继续运行。可以从任意目录使用脚本的绝对路径启动。重复启动不会重复创建服务，启动失败会清理本次新启动的服务。
+
+日志保存在 `.run/backend.log`、`.run/frontend.log`，进程记录也位于 `.run/`（不提交）。`stop.sh` 只停止该脚本记录的服务，并通过后端退出流程关闭捕获代理和托管的 Harness，不删除项目数据。脚本设置 `WORKBENCH_STOP_DSH_ON_EXIT=1` 以启用 Harness 退出清理；手动启动保持原有行为。若已有手动启动的服务占用端口，请先在原终端停止，再使用脚本。
+
+也可以手动启动：
 
 开两个终端（仓库根目录）：
 
@@ -204,7 +219,7 @@ cd backend
 .venv/bin/pytest
 ```
 
-需要本机 `mitmdump` 的捕获冒烟：`tests/test_smoke_macos.py`。PoC 经真实本地代理打 Nacos 的脚本：`PYTHONPATH=src .venv/bin/python scripts/smoke_poc_proxy.py`（Nacos 需在 8848 监听）。
+需要本机 `mitmdump` 的捕获冒烟：`tests/test_smoke_capture.py`。PoC 经真实本地代理打 Nacos 的脚本：`PYTHONPATH=src .venv/bin/python scripts/smoke_poc_proxy.py`（Nacos 需在 8848 监听）。
 
 Cairn 插件：
 
@@ -214,12 +229,38 @@ cd dsh-cairn-search && npm test
 
 ## 范围与限制
 
-- 捕获 MVP：**只记录经代理的 HTTP(S)**，且只在 macOS 上实现围栏。
+- 捕获 MVP：**只记录经代理的 HTTP(S)**，支持 macOS 与 Linux。
 - 时间线不是 Scope 引擎，也不是全包 / DNS / 连接仓库。
 - 免费公开代理不是生产出口；测活通过也不等于稳定或合法。
-- 「证据」页仍是占位。
 - DeepSeek Harness 处于开发者预览，接口可能不兼容升级。
 
 ## 许可与安全
 
 `deepseek-harness/` 有上游许可证。本工作台只应在授权范围内使用；不要对未授权系统扫描或利用。
+
+
+### 情报资产库与执行期读写
+
+进入「情报资产库」，左侧选择工作区，顶部切换「资产关联 / 凭证关联 / 身份 / Agent 读写」。支持对象搜索筛选、关联跳转、手工维护、来源历史和执行期间自动更新。工作区绑定执行目录；Cairn 主会话和子代理可以在探索中读取已有资产及凭据，并即时保存新发现，无需等待画板事实或任务结束。
+
+独立 `dsh-intel` 插件仅追加到 Cairn preset，不修改 blackboard、调度、fact、画板协议或终止条件。安装、数据备份、工具契约和边界见 [dsh-intel](dsh-intel/README.md)。存储为 `WORKBENCH_DATA/intel.sqlite` 与 `intel.key`；敏感值按需读取，日志不含原值。当前实现面向本机，不提供远程多用户认证。
+
+### 漏洞成果库与证据归档
+
+工作台「漏洞成果库」支持手工新增、证据预览/下载、人工复核、修复状态及审计历史；画板事实详情和 PoC 扫描结果提供归档入口。Cairn 的独立 `archive_finding` 工具支持 create/append/retry，核心画板协议不变。
+
+安装插件并更新已有 Cairn preset 的步骤见 [dsh-findings 安装说明](dsh-findings/README.md)。该步骤会保留用户配置并备份修改文件。成果数据存放在 `WORKBENCH_DATA/findings.sqlite` 与 `findings/`，重启或清理源网络记录不删除已归档证据。测试回执与 UI 验证见 [交付验证记录](docs/verification/findings/README.md)。
+
+#### 默认自动归档
+
+Cairn preset 内的独立归档指引要求每次授权测试加载 `finding-archive`，将已有证据支持的漏洞候选自动保存为待复核成果。探索子代理在原有 JSON fact 的 description 内带回归档 ID，父代理复用该 ID 追加材料；原始搜索协议和完成条件不变。普通进度事实、失败检查及画板完成本身不会当作漏洞。可在任务中明确要求停用自动归档。
+
+PoC 页的「命中后自动归档」默认开启，选择保存在当前浏览器；只对之后启动的扫描生效，每个命中生成待复核卡片。归档模板、扫描输出、已有响应/响应截图和明确的网络事件引用；缺失证据如实标记。模板命中不等于漏洞已确认，最终结论和修复状态仍由人工填写。
+
+PoC 自动归档队列和待提交文件副本保存在当前站点的浏览器 IndexedDB 中，刷新后可从记录中重试；重试复用同一提交，不重复建卡。成功后清除本地材料副本。浏览器存储不可用会明确报错；此时不要关闭页面。刷新后不会无限自动重试，需要点击「重试归档」。不同浏览器或端口不共享队列。Cairn 则使用执行工作区的磁盘 outbox。自动归档验证见 [验证记录](docs/verification/findings-autoarchive/README.md)。
+
+#### 导出成果报告
+
+在「漏洞成果库」点击「手工新增」旁的「导出报告」，搜索并勾选需要的成果，选择 DOCX 或 PDF 后下载。支持跨页保留选择、全选本页和清空选择，单次最多 100 项，合并为一份报告。导出包括漏洞说明、复现步骤、人工复核与修复状态、文本及图片证据、证据索引和缺口。文本正文展示前 64 KiB，超限明确提示；PNG/JPEG 图片嵌入正文。其他附件仍在成果详情中下载，导出不改变状态，也不遮盖保存的凭据。
+
+后端新增依赖 `python-docx` 与 `reportlab`，更新后安装 `backend/pyproject.toml` 中的依赖并重启后端。PDF 嵌入中文 TrueType 字体：macOS 默认读取 `/Library/Fonts/Arial Unicode.ttf`；其他环境可设置 `WORKBENCH_REPORT_FONT`，或使用系统中的文泉驿正黑/宋体。缺少字体时明确报错。DOCX 使用 Arial Unicode MS 字体样式，阅读器可按本机字体替换。

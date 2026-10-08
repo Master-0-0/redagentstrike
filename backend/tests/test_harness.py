@@ -1,6 +1,53 @@
 from dataclasses import replace
+from unittest.mock import Mock
+
+import pytest
 
 from workbench.harness import HarnessManager, _dsh_cmd, parse_ready_url
+
+
+@pytest.mark.parametrize("managed,stop_on_exit", [(True, True), (True, False), (False, True)])
+def test_close_stops_managed_harness_only_when_requested(settings, monkeypatch, managed, stop_on_exit):
+    manager = HarnessManager(replace(settings, manage_dsh=managed))
+    manager._injected = True
+    stop = Mock()
+    apply = Mock()
+    monkeypatch.setattr(manager, "_stop_listener", stop)
+    monkeypatch.setattr(manager, "apply", apply)
+    monkeypatch.setenv("WORKBENCH_STOP_DSH_ON_EXIT", "1" if stop_on_exit else "0")
+
+    manager.close()
+
+    if managed and stop_on_exit:
+        stop.assert_called_once_with()
+        apply.assert_not_called()
+    else:
+        stop.assert_not_called()
+        apply.assert_called_once_with(False)
+    assert manager._injected is False
+
+
+@pytest.mark.parametrize("new_line,running,port_open,expected", [
+    (False, True, True, None),
+    (True, False, True, None),
+    (True, True, False, None),
+    (True, True, True, "http://127.0.0.1:3081/?token=new"),
+])
+def test_wait_ready_requires_current_launch_url_and_live_process(settings, tmp_path, monkeypatch, new_line, running, port_open, expected):
+    manager = HarnessManager(settings)
+    log = tmp_path / "dsh.log"
+    log.write_text("dsh web: http://127.0.0.1:3081/?token=old\n")
+    manager._log_start = log.stat().st_size
+    if new_line:
+        with log.open("a") as handle:
+            handle.write("dsh web: http://127.0.0.1:3081/?token=new\n")
+    manager.proc = Mock()
+    manager.proc.poll.return_value = None if running else 1
+    monkeypatch.setattr("workbench.harness._port_open", lambda *_: port_open)
+    monkeypatch.setattr("workbench.harness.time.sleep", lambda _: None)
+    ticks = iter([0, 0, 2])
+    monkeypatch.setattr("workbench.harness.time.time", lambda: next(ticks))
+    assert manager._wait_ready(log, timeout=1) == expected
 
 
 def test_parse_ready_url_strips_lan_suffix():
@@ -67,3 +114,60 @@ def test_restart_injects_hook_environment(settings, tmp_path, monkeypatch):
     assert captured["WORKBENCH_DSH_HOOK_CONFIG"] == str(configured.dsh_hook_config)
     assert captured["WORKBENCH_DSH_HOOK_ROOT"] == str(configured.dsh_hook_root)
     assert captured["WORKBENCH_HOOK_URL"] == configured.hook_api_url
+
+
+def test_missing_lsof_fails_before_spawn_and_reports_status(settings, tmp_path, monkeypatch):
+    from workbench.harness import LSOF_NOT_FOUND, RequiredToolNotFound
+    manager = HarnessManager(replace(settings, manage_dsh=True, dsh_root=tmp_path))
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    spawn, inspect = Mock(), Mock()
+    monkeypatch.setattr('workbench.harness.subprocess.Popen', spawn)
+    monkeypatch.setattr('workbench.harness.subprocess.check_output', inspect)
+    with pytest.raises(RequiredToolNotFound, match='^Error: required tool lsof not found$'):
+        manager.apply(False)
+    assert manager.status()['error'] == LSOF_NOT_FOUND
+    assert manager.status()['pid'] is None
+    spawn.assert_not_called()
+    inspect.assert_not_called()
+
+
+def test_lsof_no_listener_is_not_missing_tool_and_clears_old_error(settings, monkeypatch):
+    import subprocess
+    from workbench.harness import LSOF_NOT_FOUND
+    manager = HarnessManager(settings)
+    manager.last_error = LSOF_NOT_FOUND
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: '/usr/bin/lsof')
+    inspect = Mock(side_effect=subprocess.CalledProcessError(1, ['lsof']))
+    monkeypatch.setattr('workbench.harness.subprocess.check_output', inspect)
+    assert manager.status()['error'] is None
+    assert manager.status()['pid'] is None
+    assert inspect.call_args.args[0][0] == '/usr/bin/lsof'
+
+
+def test_missing_lsof_health_and_capture_return_actionable_error(client, tmp_path, monkeypatch):
+    from workbench.harness import LSOF_NOT_FOUND
+    manager = client.app.state.wb.harness
+    manager.settings = replace(manager.settings, manage_dsh=True, dsh_root=tmp_path)
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    response = client.get('/health')
+    assert response.status_code == 200
+    assert response.json()['harness']['error'] == LSOF_NOT_FOUND
+    response = client.post('/capture', json={'enabled': False})
+    assert response.status_code == 200
+    assert response.json()['error'] == LSOF_NOT_FOUND
+    assert response.json()['capture']['harness']['error'] == LSOF_NOT_FOUND
+
+
+def test_close_stops_owned_process_even_without_lsof(settings, monkeypatch):
+    manager = HarnessManager(replace(settings, manage_dsh=True))
+    manager.proc = Mock(pid=123)
+    manager.proc.poll.return_value = None
+    handle = manager._log_handle = Mock()
+    kill = Mock()
+    monkeypatch.setattr('workbench.harness._kill_tree', kill)
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    monkeypatch.setenv('WORKBENCH_STOP_DSH_ON_EXIT', '1')
+    manager.close()
+    kill.assert_called_once_with(123, use_group=True)
+    handle.close.assert_called_once()
+    assert manager.proc is None

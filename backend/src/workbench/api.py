@@ -9,6 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import httpx
 
+from .findings import FindingsStore
+from .findings_api import router as findings_router
+from .intel import IntelStore
+from .intel_api import router as intel_router
 from .approval import ApprovalManager
 from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard
 from .config import Settings, load_settings
@@ -16,6 +20,7 @@ from .control import ControlPlane, new_id, utcnow
 from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
 from .intercept import HoldBoard, ReplayCache
 from .harness import HarnessManager
+from .host_policy import load_policy, save_policy
 from .join import align_tool_call
 from .mitm import MitmManager
 from .netstore import HttpEvent, NetStore
@@ -62,6 +67,11 @@ class ProbeBody(BaseModel):
 
 class CaptureToggle(BaseModel):
     enabled: bool
+
+
+class HostPolicyBody(BaseModel):
+    whitelist: str = Field(default="", max_length=100_000)
+    blacklist: str = Field(default="", max_length=100_000)
 
 
 class InterceptToggle(BaseModel):
@@ -147,6 +157,12 @@ class AppState:
         self.settings = settings
         self.control = ControlPlane(settings.control_db)
         self.net = NetStore(settings.net_db)
+        self.findings = FindingsStore(settings, self.net)
+        try:
+            self.intel = IntelStore(settings.data_dir)
+        except Exception:
+            # A missing key or damaged intelligence database must not stop Cairn.
+            self.intel = None
         ingest = "http://{}:{}/internal/net/http".format(settings.api_host, settings.api_port)
         self.mitm = MitmManager(settings, ingest_url=ingest)
         self.holds = HoldBoard()
@@ -206,6 +222,9 @@ class AppState:
         return entry
 
     def close(self) -> None:
+        if self.intel is not None:
+            self.intel.close()
+        self.findings.close()
         self.poc_recorder.invalidate()
         self.holds.release_all("drop")
         self.mitm.close()
@@ -230,6 +249,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             state.close()
 
     app = FastAPI(title="workbench", lifespan=lifespan)
+    app.include_router(findings_router)
+    app.include_router(intel_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -418,6 +439,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             except RuntimeError as exc:
                 capture_error = str(exc)
                 st.control.mark_capture_started(run.id, False)
+            else:
+                capture_error = _apply_harness(st, True)
         stored = st.control.get_run(run.id) or run
         return {
             "run": stored.as_dict(),
@@ -432,8 +455,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run_not_found")
         st.poc_recorder.invalidate()
         st.mitm.stop()
+        capture_error = _apply_harness(st, False)
         run = st.control.end_run(run_id)
-        return {"run": run.as_dict(), "capture": st.mitm.status()}
+        return {"run": run.as_dict(), "capture": st.mitm.status(), "capture_error": capture_error}
 
     @app.post("/runs/{run_id}/events")
     def add_event(run_id: str, body: ToolCallBody) -> Dict[str, Any]:
@@ -703,6 +727,36 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "error": error,
         }
 
+    @app.get("/capture/hosts")
+    def get_host_policy() -> Dict[str, Any]:
+        try:
+            return load_policy(state().settings.host_policy_path)
+        except (OSError, ValueError, KeyError, TypeError):
+            raise HTTPException(status_code=503, detail="无法读取 host 黑白名单配置")
+
+    @app.put("/capture/hosts")
+    def put_host_policy(body: HostPolicyBody) -> Dict[str, Any]:
+        try:
+            return save_policy(state().settings.host_policy_path, body.whitelist, body.blacklist)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except OSError:
+            raise HTTPException(status_code=503, detail="无法保存 host 黑白名单配置")
+
+    @app.post("/capture/harness")
+    def attach_harness() -> Dict[str, Any]:
+        st = state()
+        if not st.settings.manage_dsh:
+            error = "dsh_unmanaged"
+        elif not st.mitm.listening:
+            error = "capture_not_running"
+        else:
+            error = _apply_harness(st, True)
+        capture = capture_blob()
+        if error is None and not capture["harness"]["proxied"]:
+            error = "dsh_proxy_not_ready"
+        return {"capture": capture, "error": error}
+
     @app.post("/capture/intercept")
     def set_intercept(body: InterceptToggle) -> Dict[str, Any]:
         st = state()
@@ -770,6 +824,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if event is None:
             raise HTTPException(status_code=404, detail="event_not_found")
         item = event.as_api(include_bodies=True)
+        item["run_id"] = event.run_id
         run = st.control.get_run(event.run_id)
         if run is not None:
             tool_calls = [e for e in st.control.list_events(run.id) if e.kind == "tool_call"]

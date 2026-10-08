@@ -1,5 +1,6 @@
 .DS_Store
 .pnpm-store/
+.run/
 **/.env
 **/.env.local
 **/*.tsbuildinfo
@@ -15,3 +16,6 @@ backend/*.egg-info/
 
 # Local Vulhub lab clone; do not publish with this repo.
 vulhub-nacos-cve-2021-29441/
+
+# Private findings evidence and retry manifests
+**/.dsh/findings-outbox/

@@ -1,0 +1,225 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.94kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm
+#2 DONE 1.7s
+
+#3 [baseline  1/25] FROM docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+#3 resolve docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0 0.0s done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 226.25kB 0.1s
+#4 transferring context: 1.07MB 0.8s done
+#4 DONE 0.8s
+
+#5 [baseline  8/25] RUN backend/.venv/bin/pip install -e './backend[dev]' && backend/.venv-mitm/bin/pip install mitmproxy
+#5 CACHED
+
+#6 [baseline 19/25] COPY dsh-theme-hacker dsh-theme-hacker
+#6 CACHED
+
+#7 [baseline  9/25] RUN backend/.venv/bin/python -m playwright install --with-deps chromium
+#7 CACHED
+
+#8 [baseline  7/25] COPY backend backend
+#8 CACHED
+
+#9 [baseline 12/25] COPY web-ui web-ui
+#9 CACHED
+
+#10 [baseline 18/25] COPY dsh-cairn-search dsh-cairn-search
+#10 CACHED
+
+#11 [baseline 23/25] COPY .dsh/skills .dsh/skills
+#11 CACHED
+
+#12 [baseline  3/25] RUN npm install -g pnpm@11.7.0
+#12 CACHED
+
+#13 [baseline 11/25] RUN cd web-ui && npm ci
+#13 CACHED
+
+#14 [baseline 17/25] RUN test -n "4165dd064531f6444d75abadb47310042e5d5865" && cd deepseek-harness && DSH_CLIENT_COMMIT_HASH="4165dd064531f6444d75abadb47310042e5d5865" pnpm run build
+#14 CACHED
+
+#15 [baseline  5/25] COPY backend/pyproject.toml backend/pyproject.toml
+#15 CACHED
+
+#16 [baseline  6/25] RUN python3 -m venv backend/.venv && python3 -m venv backend/.venv-mitm
+#16 CACHED
+
+#17 [baseline 10/25] COPY web-ui/package*.json web-ui/
+#17 CACHED
+
+#18 [baseline 13/25] COPY dsh-cairn-search/src dsh-cairn-search/src
+#18 CACHED
+
+#19 [baseline  2/25] RUN apt-get update && apt-get install -y --no-install-recommends     python3 python3-venv python3-dev build-essential procps curl fonts-wqy-zenhei     && rm -rf /var/lib/apt/lists/*
+#19 CACHED
+
+#20 [baseline 20/25] COPY dsh-intel dsh-intel
+#20 CACHED
+
+#21 [baseline  4/25] WORKDIR /app
+#21 CACHED
+
+#22 [baseline 22/25] RUN for plugin in dsh-cairn-search dsh-theme-hacker dsh-intel dsh-findings; do       (cd "$plugin" && npm ci && npm run build) || exit; done
+#22 CACHED
+
+#23 [baseline 21/25] COPY dsh-findings dsh-findings
+#23 CACHED
+
+#24 [baseline 15/25] COPY deepseek-harness deepseek-harness
+#24 CACHED
+
+#25 [baseline 16/25] RUN cd deepseek-harness && pnpm install --frozen-lockfile
+#25 CACHED
+
+#26 [baseline 14/25] RUN cd web-ui && npm run build
+#26 CACHED
+
+#27 [baseline 24/25] COPY start.sh stop.sh ./
+#27 CACHED
+
+#28 [baseline 25/25] COPY docker/linux-compat/run-tests.sh /usr/local/bin/compat-tests
+#28 DONE 0.0s
+
+#29 [linux-compat 1/5] RUN apt-get update && apt-get install -y --no-install-recommends lsof bubblewrap musl-tools     && rm -rf /var/lib/apt/lists/*
+#29 0.472 Hit:1 http://deb.debian.org/debian bookworm InRelease
+#29 0.644 Hit:2 http://deb.debian.org/debian bookworm-updates InRelease
+#29 0.846 Hit:3 http://deb.debian.org/debian-security bookworm-security InRelease
+#29 0.891 Reading package lists...
+#29 1.368 Reading package lists...
+#29 1.800 Building dependency tree...
+#29 1.884 Reading state information...
+#29 1.978 The following additional packages will be installed:
+#29 1.978   musl musl-dev
+#29 1.979 Recommended packages:
+#29 1.979   linux-musl-dev
+#29 2.030 The following NEW packages will be installed:
+#29 2.030   bubblewrap lsof musl musl-dev musl-tools
+#29 2.544 0 upgraded, 5 newly installed, 0 to remove and 0 not upgraded.
+#29 2.544 Need to get 1359 kB of archives.
+#29 2.544 After this operation, 4636 kB of additional disk space will be used.
+#29 2.544 Get:1 http://deb.debian.org/debian bookworm/main arm64 lsof arm64 4.95.0-1 [313 kB]
+#29 2.847 Get:2 http://deb.debian.org/debian bookworm/main arm64 bubblewrap arm64 0.8.0-2+deb12u1 [45.2 kB]
+#29 3.520 Get:3 http://deb.debian.org/debian bookworm/main arm64 musl arm64 1.2.3-1 [392 kB]
+#29 4.192 Get:4 http://deb.debian.org/debian bookworm/main arm64 musl-dev arm64 1.2.3-1 [567 kB]
+#29 4.515 Get:5 http://deb.debian.org/debian bookworm/main arm64 musl-tools arm64 1.2.3-1 [42.3 kB]
+#29 4.668 debconf: delaying package configuration, since apt-utils is not installed
+#29 4.688 Fetched 1359 kB in 2s (547 kB/s)
+#29 4.702 Selecting previously unselected package lsof.
+#29 4.702 (Reading database ...
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 24880 files and directories currently installed.)
+#29 4.741 Preparing to unpack .../lsof_4.95.0-1_arm64.deb ...
+#29 4.743 Unpacking lsof (4.95.0-1) ...
+#29 4.770 Selecting previously unselected package bubblewrap.
+#29 4.772 Preparing to unpack .../bubblewrap_0.8.0-2+deb12u1_arm64.deb ...
+#29 4.773 Unpacking bubblewrap (0.8.0-2+deb12u1) ...
+#29 4.793 Selecting previously unselected package musl:arm64.
+#29 4.794 Preparing to unpack .../musl_1.2.3-1_arm64.deb ...
+#29 4.796 Unpacking musl:arm64 (1.2.3-1) ...
+#29 4.831 Selecting previously unselected package musl-dev:arm64.
+#29 4.833 Preparing to unpack .../musl-dev_1.2.3-1_arm64.deb ...
+#29 4.834 Unpacking musl-dev:arm64 (1.2.3-1) ...
+#29 4.879 Selecting previously unselected package musl-tools.
+#29 4.880 Preparing to unpack .../musl-tools_1.2.3-1_arm64.deb ...
+#29 4.881 Unpacking musl-tools (1.2.3-1) ...
+#29 4.900 Setting up bubblewrap (0.8.0-2+deb12u1) ...
+#29 4.905 Setting up lsof (4.95.0-1) ...
+#29 4.908 Setting up musl:arm64 (1.2.3-1) ...
+#29 4.913 Setting up musl-dev:arm64 (1.2.3-1) ...
+#29 4.917 Setting up musl-tools (1.2.3-1) ...
+#29 DONE 4.9s
+
+#30 [linux-compat 2/5] RUN cd deepseek-harness/native/landlock-run && pnpm run build:native
+#30 0.617 $ tsx ./scripts/build.ts
+#30 0.850 build: built linux-arm64/bin/landlock-run
+#30 DONE 0.9s
+
+#31 [linux-compat 3/5] RUN cd deepseek-harness && pnpm dsh plugin --profile web add     /app/dsh-cairn-search /app/dsh-theme-hacker /app/dsh-intel /app/dsh-findings
+#31 0.564 $ node --import tsx/esm apps/cli/src/bin.ts plugin --profile web add /app/dsh-cairn-search /app/dsh-theme-hacker /app/dsh-intel /app/dsh-findings
+#31 0.836 dsh: initialized profile web at /root/.dsh/profiles/web
+#31 1.226
+#31 1.226 dependencies:
+#31 1.226 + dsh-cairn-search link:/app/dsh-cairn-search
+#31 1.226 + dsh-findings link:/app/dsh-findings
+#31 1.226 + dsh-intel link:/app/dsh-intel
+#31 1.226 + dsh-theme-hacker link:/app/dsh-theme-hacker
+#31 1.226
+#31 1.229 Already up to date
+#31 1.246 Done in 393ms using pnpm v11.7.0
+#31 DONE 1.3s
+
+#32 [linux-compat 4/5] RUN mkdir -p /root/.dsh/.agent-presets/cairn     && cp -R dsh-cairn-search/preset/. /root/.dsh/.agent-presets/cairn/     && npm --prefix dsh-cairn-search run link-peers     && npm --prefix dsh-intel run link-peers && npm --prefix dsh-intel run install-preset     && npm --prefix dsh-findings run link-peers && npm --prefix dsh-findings run install-preset
+#32 0.193
+#32 0.193 > dsh-cairn-search@0.1.0 link-peers
+#32 0.193 > node scripts/link-peers.mjs
+#32 0.193
+#32 0.216 linked @deepseek-ai/dsh-tools -> /root/.dsh/profiles/node_modules/@deepseek-ai/dsh-tools
+#32 0.217 linked @deepseek-ai/cordis -> /root/.dsh/profiles/node_modules/@deepseek-ai/cordis
+#32 0.284
+#32 0.284 > dsh-intel@0.1.0 link-peers
+#32 0.284 > node scripts/link-peers.mjs
+#32 0.284
+#32 0.308 linked @deepseek-ai/dsh-tools -> /root/.dsh/profiles/node_modules/@deepseek-ai/dsh-tools
+#32 0.308 linked @deepseek-ai/cordis -> /root/.dsh/profiles/node_modules/@deepseek-ai/cordis
+#32 0.375
+#32 0.375 > dsh-intel@0.1.0 install-preset
+#32 0.375 > node scripts/install-preset.mjs
+#32 0.375
+#32 0.397 Updated /root/.dsh/.agent-presets/cairn; existing settings preserved. Restart the Harness when no active session needs it.
+#32 0.397 Encrypted retry queue is under DSH_HOME/intel-outbox; keep its key private.
+#32 0.467
+#32 0.467 > dsh-findings@0.1.0 link-peers
+#32 0.467 > node scripts/link-peers.mjs
+#32 0.467
+#32 0.488 linked @deepseek-ai/dsh-tools -> /root/.dsh/profiles/node_modules/@deepseek-ai/dsh-tools
+#32 0.489 linked @deepseek-ai/cordis -> /root/.dsh/profiles/node_modules/@deepseek-ai/cordis
+#32 0.555
+#32 0.555 > dsh-findings@0.1.0 install-preset
+#32 0.555 > node scripts/install-preset.mjs
+#32 0.555
+#32 0.578 Updated /root/.dsh/.agent-presets/cairn; existing settings preserved. Restart the Harness when no active session needs it.
+#32 0.578 For each execution workspace add .dsh/findings-outbox/ to its ignore file. Evidence stays private and is not automatically cleaned.
+#32 DONE 0.6s
+
+#33 [linux-compat 5/5] COPY docker/linux-compat/*.py docker/linux-compat/*.mjs docker/linux-compat/*.sh /opt/linux-compat/
+#33 DONE 0.0s
+
+#34 exporting to image
+#34 exporting layers
+#34 exporting layers 0.2s done
+#34 exporting manifest sha256:c65514f6fb432e17f49695f0b3db82681b5a46a13c09829c67035145bce522ca done
+#34 exporting config sha256:c1bc926fb22321e360e1d17dd01ae97923a4ad7ccacf3a01ea73254780383caf done
+#34 exporting attestation manifest sha256:c08676bbd8f33d2eef6bf9a25bcbef2e2d676ac2f51e809ae6b48c0ba879ac3d done
+#34 exporting manifest list sha256:a7b287605f04933f361ffe35f1c85ab50725826067c6fc4e702fdc7952ddd4a7 done
+#34 naming to docker.io/library/ct-st3-linux-compat:debian12 done
+#34 unpacking to docker.io/library/ct-st3-linux-compat:debian12 0.1s done
+#34 DONE 0.3s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/38ubct3lnzivtnfq6va98pdr8

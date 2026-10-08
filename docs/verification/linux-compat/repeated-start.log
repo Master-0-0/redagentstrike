@@ -1,0 +1,5 @@
+backend 已在运行。
+frontend 已在运行。
+项目已启动：http://127.0.0.1:5173
+日志目录：/app/.run
+停止：/app/stop.sh

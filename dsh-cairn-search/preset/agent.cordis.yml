@@ -265,3 +265,9 @@
   config:
     fetch: true
     searchTimeoutMs: 60000
+
+# Independent evidence archive; no changes to blackboard completion rules.
+- id: findings-archive
+  name: dsh-findings
+  config:
+    apiUrl: http://127.0.0.1:8787

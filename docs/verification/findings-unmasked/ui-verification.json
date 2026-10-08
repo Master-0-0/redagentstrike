@@ -1,0 +1,12 @@
+{
+  "manual_create": true,
+  "preview_preserves_credentials": true,
+  "html_inert": true,
+  "download_preserves_bytes": true,
+  "human_review_edit": true,
+  "append_preserves_review": true,
+  "search_empty_state": true,
+  "poll_failure_preserves_results": true,
+  "retry_recovers": true,
+  "page_errors": []
+}

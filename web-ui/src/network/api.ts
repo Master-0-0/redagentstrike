@@ -12,6 +12,23 @@ import type {
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
+export type HostPolicy = { whitelist: string[]; blacklist: string[] }
+
+export async function fetchHostPolicy(): Promise<HostPolicy> {
+  return parse(await fetch('/api/capture/hosts', { cache: 'no-store' }))
+}
+
+export async function saveHostPolicy(whitelist: string, blacklist: string): Promise<HostPolicy> {
+  const response = await fetch('/api/capture/hosts', {
+    method: 'PUT', headers: jsonHeaders, body: JSON.stringify({ whitelist, blacklist }),
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(typeof body?.detail === 'string' ? body.detail : '保存失败，请检查输入或稍后重试')
+  }
+  return response.json() as Promise<HostPolicy>
+}
+
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text()
@@ -47,6 +64,10 @@ export async function setCapture(enabled: boolean): Promise<{ error: string | nu
     headers: jsonHeaders,
     body: JSON.stringify({ enabled }),
   }))
+}
+
+export async function attachHarness(): Promise<{ capture: NetworkPayload['capture']; error: string | null }> {
+  return parse(await fetch('/api/capture/harness', { method: 'POST' }))
 }
 
 export async function setIntercept(enabled: boolean): Promise<{ error: string | null }> {
