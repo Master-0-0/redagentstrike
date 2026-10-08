@@ -24,6 +24,13 @@ READY_RE = re.compile(
 )
 
 
+LSOF_NOT_FOUND = "Error: required tool lsof not found"
+
+
+class RequiredToolNotFound(RuntimeError):
+    """A required process-inspection tool is unavailable."""
+
+
 def parse_ready_url(text: str) -> Optional[str]:
     matches = READY_RE.findall(text)
     return matches[-1] if matches else None
@@ -40,7 +47,10 @@ class HarnessManager:
         self._log_start = 0
 
     def status(self) -> dict:
-        pid = self._listen_pid()
+        try:
+            pid = self._listen_pid()
+        except RequiredToolNotFound:
+            pid = None
         proxied = self._pid_is_proxied(pid) if pid else False
         if pid:
             found = self._url_from_log()
@@ -76,8 +86,14 @@ class HarnessManager:
 
     def close(self) -> None:
         if self.settings.manage_dsh and os.environ.get("WORKBENCH_STOP_DSH_ON_EXIT") == "1":
-            self._stop_listener()
-            self._injected = False
+            try:
+                self._stop_listener()
+            except RequiredToolNotFound:
+                # An owned process was already stopped; port discovery is unavailable.
+                pass
+            finally:
+                self._injected = False
+                self._close_log()
             return
         if self._injected:
             try:
@@ -154,7 +170,14 @@ class HarnessManager:
         self._close_log()
 
     def _listen_pid(self) -> Optional[int]:
-        return _listen_pid(self.settings.dsh_port)
+        try:
+            pid = _listen_pid(self.settings.dsh_port)
+        except RequiredToolNotFound as exc:
+            self.last_error = str(exc)
+            raise
+        if self.last_error == LSOF_NOT_FOUND:
+            self.last_error = None
+        return pid
 
     def _pid_is_proxied(self, pid: int) -> bool:
         blob = _process_command_env(pid)
@@ -210,12 +233,17 @@ def _dsh_cmd(settings: Settings) -> List[str]:
 
 
 def _listen_pid(port: int) -> Optional[int]:
+    binary = shutil.which("lsof")
+    if binary is None:
+        raise RequiredToolNotFound(LSOF_NOT_FOUND)
     try:
         out = subprocess.check_output(
-            ["lsof", "-nP", "-iTCP:{}".format(port), "-sTCP:LISTEN"],
+            [binary, "-nP", "-iTCP:{}".format(port), "-sTCP:LISTEN"],
             text=True,
             stderr=subprocess.DEVNULL,
         )
+    except FileNotFoundError as exc:
+        raise RequiredToolNotFound(LSOF_NOT_FOUND) from exc
     except (OSError, subprocess.CalledProcessError):
         return None
     for line in out.splitlines()[1:]:

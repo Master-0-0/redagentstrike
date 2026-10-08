@@ -88,6 +88,8 @@ try:
         raise RuntimeError('缺少 Node.js 或前端依赖，请按 README 安装 Node.js 并在 web-ui 执行 npm install。')
     from workbench.config import load_settings
     settings = load_settings()
+    if settings.manage_dsh and shutil.which('lsof') is None:
+        raise RuntimeError('Error: required tool lsof not found')
     env = os.environ.copy()
     env['WORKBENCH_STOP_DSH_ON_EXIT'] = '1'
     api_host = settings.api_host

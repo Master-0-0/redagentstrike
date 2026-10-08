@@ -114,3 +114,60 @@ def test_restart_injects_hook_environment(settings, tmp_path, monkeypatch):
     assert captured["WORKBENCH_DSH_HOOK_CONFIG"] == str(configured.dsh_hook_config)
     assert captured["WORKBENCH_DSH_HOOK_ROOT"] == str(configured.dsh_hook_root)
     assert captured["WORKBENCH_HOOK_URL"] == configured.hook_api_url
+
+
+def test_missing_lsof_fails_before_spawn_and_reports_status(settings, tmp_path, monkeypatch):
+    from workbench.harness import LSOF_NOT_FOUND, RequiredToolNotFound
+    manager = HarnessManager(replace(settings, manage_dsh=True, dsh_root=tmp_path))
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    spawn, inspect = Mock(), Mock()
+    monkeypatch.setattr('workbench.harness.subprocess.Popen', spawn)
+    monkeypatch.setattr('workbench.harness.subprocess.check_output', inspect)
+    with pytest.raises(RequiredToolNotFound, match='^Error: required tool lsof not found$'):
+        manager.apply(False)
+    assert manager.status()['error'] == LSOF_NOT_FOUND
+    assert manager.status()['pid'] is None
+    spawn.assert_not_called()
+    inspect.assert_not_called()
+
+
+def test_lsof_no_listener_is_not_missing_tool_and_clears_old_error(settings, monkeypatch):
+    import subprocess
+    from workbench.harness import LSOF_NOT_FOUND
+    manager = HarnessManager(settings)
+    manager.last_error = LSOF_NOT_FOUND
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: '/usr/bin/lsof')
+    inspect = Mock(side_effect=subprocess.CalledProcessError(1, ['lsof']))
+    monkeypatch.setattr('workbench.harness.subprocess.check_output', inspect)
+    assert manager.status()['error'] is None
+    assert manager.status()['pid'] is None
+    assert inspect.call_args.args[0][0] == '/usr/bin/lsof'
+
+
+def test_missing_lsof_health_and_capture_return_actionable_error(client, tmp_path, monkeypatch):
+    from workbench.harness import LSOF_NOT_FOUND
+    manager = client.app.state.wb.harness
+    manager.settings = replace(manager.settings, manage_dsh=True, dsh_root=tmp_path)
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    response = client.get('/health')
+    assert response.status_code == 200
+    assert response.json()['harness']['error'] == LSOF_NOT_FOUND
+    response = client.post('/capture', json={'enabled': False})
+    assert response.status_code == 200
+    assert response.json()['error'] == LSOF_NOT_FOUND
+    assert response.json()['capture']['harness']['error'] == LSOF_NOT_FOUND
+
+
+def test_close_stops_owned_process_even_without_lsof(settings, monkeypatch):
+    manager = HarnessManager(replace(settings, manage_dsh=True))
+    manager.proc = Mock(pid=123)
+    manager.proc.poll.return_value = None
+    handle = manager._log_handle = Mock()
+    kill = Mock()
+    monkeypatch.setattr('workbench.harness._kill_tree', kill)
+    monkeypatch.setattr('workbench.harness.shutil.which', lambda name: None)
+    monkeypatch.setenv('WORKBENCH_STOP_DSH_ON_EXIT', '1')
+    manager.close()
+    kill.assert_called_once_with(123, use_group=True)
+    handle.close.assert_called_once()
+    assert manager.proc is None
