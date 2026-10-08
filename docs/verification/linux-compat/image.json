@@ -1,0 +1,10 @@
+{
+  "Id": "sha256:a7b287605f04933f361ffe35f1c85ab50725826067c6fc4e702fdc7952ddd4a7",
+  "RepoTags": [
+    "ct-st3-linux-compat:debian12"
+  ],
+  "Created": "2026-10-08T18:44:18.307486846Z",
+  "Architecture": "arm64",
+  "Os": "linux",
+  "Size": 1798583789
+}

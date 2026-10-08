@@ -1,0 +1,2 @@
+start_exit=1
+PASS: all three service ports closed after stop.

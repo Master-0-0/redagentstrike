@@ -1,0 +1,2 @@
+$ tsx ./scripts/build.ts
+build: built linux-arm64/bin/landlock-run

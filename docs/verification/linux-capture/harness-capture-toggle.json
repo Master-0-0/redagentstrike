@@ -1,0 +1,66 @@
+{
+  "enable": {
+    "capture": {
+      "mode": "proxy_inject",
+      "scope": "http_only",
+      "platform": "linux",
+      "os": "Linux",
+      "listening": true,
+      "pid": 1520,
+      "supported": true,
+      "proxy": "http://127.0.0.1:8088",
+      "error": null,
+      "intercept": false,
+      "pending_count": 0,
+      "pending": [],
+      "harness": {
+        "managed": true,
+        "proxied": true,
+        "pid": 1528,
+        "url": "http://127.0.0.1:3081/?token=<redacted>",
+        "error": null
+      }
+    },
+    "run": {
+      "id": "run-46f314c54e39471e",
+      "title": "session",
+      "created_at": "2026-10-08T20:28:08.475315Z",
+      "ended_at": null,
+      "capture_started": true,
+      "open": true
+    },
+    "error": null
+  },
+  "disable": {
+    "capture": {
+      "mode": "proxy_inject",
+      "scope": "http_only",
+      "platform": "linux",
+      "os": "Linux",
+      "listening": false,
+      "pid": null,
+      "supported": true,
+      "proxy": "http://127.0.0.1:8088",
+      "error": null,
+      "intercept": false,
+      "pending_count": 0,
+      "pending": [],
+      "harness": {
+        "managed": true,
+        "proxied": false,
+        "pid": 1553,
+        "url": "http://127.0.0.1:3081/?token=<redacted>",
+        "error": null
+      }
+    },
+    "run": {
+      "id": "run-46f314c54e39471e",
+      "title": "session",
+      "created_at": "2026-10-08T20:28:08.475315Z",
+      "ended_at": null,
+      "capture_started": true,
+      "open": true
+    },
+    "error": null
+  }
+}

@@ -75,6 +75,10 @@ class HarnessManager:
         self.last_error = None
 
     def close(self) -> None:
+        if self.settings.manage_dsh and os.environ.get("WORKBENCH_STOP_DSH_ON_EXIT") == "1":
+            self._stop_listener()
+            self._injected = False
+            return
         if self._injected:
             try:
                 self.apply(False)

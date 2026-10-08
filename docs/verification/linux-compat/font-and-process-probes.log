@@ -1,0 +1,3 @@
+No CJK font: ArchiveError PDF 中文字体不可用，请配置 WORKBENCH_REPORT_FONT 为支持中文的 TrueType 字体路径
+Restored CJK font: FindingsCJK
+PASS: Linux ps environment detection

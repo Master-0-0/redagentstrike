@@ -1,0 +1,21 @@
+{
+  "mode": "proxy_inject",
+  "scope": "http_only",
+  "platform": "linux",
+  "os": "Linux",
+  "listening": false,
+  "pid": null,
+  "supported": true,
+  "proxy": "http://127.0.0.1:8088",
+  "error": null,
+  "intercept": false,
+  "pending_count": 0,
+  "pending": [],
+  "harness": {
+    "managed": true,
+    "proxied": false,
+    "pid": 1553,
+    "url": "http://127.0.0.1:3081/?token=<redacted>",
+    "error": null
+  }
+}

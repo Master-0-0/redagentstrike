@@ -1,0 +1,46 @@
+
+> dsh-cairn-search@0.1.0 test
+> node --test --experimental-strip-types tests/*.test.ts
+
+✔ init: origin, goal, checkpoint, bootstrap next (1.431667ms)
+✔ loadBoard returns null when missing; saveBoard writes 2-space JSON atomically (12.92625ms)
+✔ parallel main sessions keep separate board files (5.581833ms)
+✔ copyBoardIfAbsent snapshots a fork without clobbering an existing dest (5.094792ms)
+✔ seedBoard adopts legacy .dsh/blackboard.json once per owner (4.7985ms)
+✔ bootstrap path: reserved intent, claim, conclude fact (0.478542ms)
+✔ reason after fact: conclude produces new-fact trigger (0.144625ms)
+✔ reason concurrent with open intents: new hint triggers reason (0.33225ms)
+✔ declare intents does not retrigger reason (0.145542ms)
+✔ explore newest unclaimed non-bootstrap intent (0.168292ms)
+✔ claim-before-conclude (0.302417ms)
+✔ same worker claim is heartbeat; other worker cannot steal (0.099334ms)
+✔ release is not a reason trigger (0.137958ms)
+✔ goal must not appear in from (0.150375ms)
+✔ complete to=goal marks board completed (0.114875ms)
+✔ stop blocks conclude; hint on stopped is ok (0.12025ms)
+✔ finishReason truncates to MAX_INTENTS and empty requires open intents (0.157875ms)
+✔ startReason same worker renews; other worker is rejected (0.078042ms)
+✔ ensureBootstrapIntent is idempotent on initial boards (0.045208ms)
+✔ boardRelativePath uses the encoded main-session id (7.678459ms)
+✔ a new or restored main session owns its own board (0.154625ms)
+✔ subagents including nested children share the main session board (0.1085ms)
+✔ a conversation fork is its own owner and copies from the source owner (0.483958ms)
+✔ fork of a subagent copies the main session board, not the child id (0.33625ms)
+✔ missing parent of a subagent is treated as the owner (0.451875ms)
+✔ boardOwnerFromList follows the selected sidebar session (0.67975ms)
+✔ boardOwnerFromList uses the subagent catalog when the child is not a list row (3.289833ms)
+✔ loadBoardSnapshot pages until eof and lays out a valid board (1.560958ms)
+✔ loadBoardSnapshot treats not-found as missing (0.51325ms)
+✔ loadBoardSnapshot reads the owner-scoped board path (0.193667ms)
+✔ parseBoard accepts the skill example and layoutBoard places origin → f001 → open stub, goal on the right (6.25425ms)
+✔ parseBoard rejects non-JSON and incomplete objects (0.232958ms)
+✔ readBoardText maps empty, invalid, and ready bodies (0.958417ms)
+✔ complete intents (to=goal) are status complete, and edgePath runs left to right (0.273792ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 160.025541

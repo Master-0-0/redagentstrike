@@ -6,6 +6,27 @@ import pytest
 from workbench.harness import HarnessManager, _dsh_cmd, parse_ready_url
 
 
+@pytest.mark.parametrize("managed,stop_on_exit", [(True, True), (True, False), (False, True)])
+def test_close_stops_managed_harness_only_when_requested(settings, monkeypatch, managed, stop_on_exit):
+    manager = HarnessManager(replace(settings, manage_dsh=managed))
+    manager._injected = True
+    stop = Mock()
+    apply = Mock()
+    monkeypatch.setattr(manager, "_stop_listener", stop)
+    monkeypatch.setattr(manager, "apply", apply)
+    monkeypatch.setenv("WORKBENCH_STOP_DSH_ON_EXIT", "1" if stop_on_exit else "0")
+
+    manager.close()
+
+    if managed and stop_on_exit:
+        stop.assert_called_once_with()
+        apply.assert_not_called()
+    else:
+        stop.assert_not_called()
+        apply.assert_called_once_with(False)
+    assert manager._injected is False
+
+
 @pytest.mark.parametrize("new_line,running,port_open,expected", [
     (False, True, True, None),
     (True, False, True, None),

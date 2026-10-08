@@ -642,7 +642,7 @@ function captureErrorText(code: string): string {
   if (code === 'dsh_unmanaged') return '当前工作台未由控制面管理，无法自动注入代理配置。'
   if (code === 'dsh_proxy_not_ready') return '工作台尚未接入代理，请检查工作台启动日志后重试。'
   if (code === 'mitmproxy_missing') return '未找到 mitmdump。安装 mitmproxy 后才能真正抓到经代理的流量。'
-  if (code === 'capture_macos_only') return 'MVP 仅支持 macOS 捕获。'
+  if (code === 'capture_platform_unsupported') return '当前系统暂不支持捕获，请使用 macOS 或 Linux。'
   if (code === 'mitm_start_timeout') return 'mitm 启动超时，检查 8088 端口是否被占用。'
   if (code === 'proxy_port_busy') return '127.0.0.1:8088 已被占用。'
   if (code === 'dsh_root_missing') return '找不到 DeepSeek Harness 目录，Agent 工作台无法自动接入代理。'

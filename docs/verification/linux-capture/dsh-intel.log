@@ -1,0 +1,16 @@
+
+> dsh-intel@0.1.0 test
+> node --test --experimental-strip-types tests/*.test.ts
+
+✔ local endpoint rejects remote roots, redirects credentials and URL payloads (0.953667ms)
+✔ runtime context follows subagent lineage, forks own their source, no board required (4.027083ms)
+✔ encrypted durable retry, stable context, query whitelist, timeout and failures (75.878209ms)
+✔ preset installer is additive, backed up and idempotent; custom settings survive (55.232667ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 176.046292

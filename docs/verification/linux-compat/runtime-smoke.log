@@ -1,0 +1,1 @@
+PASS: native Linux capture block reproduced; diagnostic HTTP proxy → addon → DuckDB passed; real Chromium screenshot passed.

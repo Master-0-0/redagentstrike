@@ -1,0 +1,4 @@
+{"launcher":"/app/deepseek-harness/native/landlock-run/packages/linux-arm64/bin/landlock-run","exists":true,"probe":"full"}
+{"mode":"read-only","command":"printf linux-sandbox-ok","enforcement":"full","status":0,"stdout":"linux-sandbox-ok","stderr":""}
+{"mode":"read-only","command":"touch /root/compat-sandbox-workspace/denied","enforcement":"full","status":1,"stdout":"","stderr":"touch: cannot touch '/root/compat-sandbox-workspace/denied': Permission denied\n"}
+{"mode":"workspace-write","command":"touch /root/compat-sandbox-workspace/allowed","enforcement":"full","status":0,"stdout":"","stderr":""}

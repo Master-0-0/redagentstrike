@@ -2,7 +2,7 @@
 
 单机渗透测试 Agent 工作台：把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 嵌进侧栏，并补上审批、画板、HTTP 网络时间线、PoC 扫描和出口代理池。
 
-MVP 面向 **macOS 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，不是多用户远程产品。仅在你有权测试的环境上使用。
+MVP 面向 **macOS / Linux 本机自用**。控制面与 Web 默认只绑 `127.0.0.1`，不是多用户远程产品。仅在你有权测试的环境上使用。
 
 ## 它做什么
 
@@ -43,7 +43,7 @@ dsh-intel/             Cairn 独立情报读写工具（query_intel_lib / save_i
 
 ## 环境要求
 
-- macOS（网络捕获仅 darwin；其它平台 API 可起，捕获会报 `capture_macos_only`）
+- macOS 或 Linux（网络捕获需要 mitmdump；其他平台返回 `capture_platform_unsupported`）
 - Python 3.9+
 - Node.js `^22.19` 或 `>=24`，以及 [pnpm](https://pnpm.io/) 11.x
 - 可选：`mitmdump`（捕获）、Docker（Nacos 靶场）、Chromium（PoC 命中截图）
@@ -121,6 +121,19 @@ cd ..
 ```
 
 ### 6. 启动
+
+完成上述首次安装后，可直接运行根目录的启停脚本：
+
+```sh
+./start.sh
+./stop.sh
+```
+
+`start.sh` 后台启动后端与前端，等待健康检查通过后打印访问地址；关闭终端后服务继续运行。可以从任意目录使用脚本的绝对路径启动。重复启动不会重复创建服务，启动失败会清理本次新启动的服务。
+
+日志保存在 `.run/backend.log`、`.run/frontend.log`，进程记录也位于 `.run/`（不提交）。`stop.sh` 只停止该脚本记录的服务，并通过后端退出流程关闭捕获代理和托管的 Harness，不删除项目数据。脚本设置 `WORKBENCH_STOP_DSH_ON_EXIT=1` 以启用 Harness 退出清理；手动启动保持原有行为。若已有手动启动的服务占用端口，请先在原终端停止，再使用脚本。
+
+也可以手动启动：
 
 开两个终端（仓库根目录）：
 
@@ -206,7 +219,7 @@ cd backend
 .venv/bin/pytest
 ```
 
-需要本机 `mitmdump` 的捕获冒烟：`tests/test_smoke_macos.py`。PoC 经真实本地代理打 Nacos 的脚本：`PYTHONPATH=src .venv/bin/python scripts/smoke_poc_proxy.py`（Nacos 需在 8848 监听）。
+需要本机 `mitmdump` 的捕获冒烟：`tests/test_smoke_capture.py`。PoC 经真实本地代理打 Nacos 的脚本：`PYTHONPATH=src .venv/bin/python scripts/smoke_poc_proxy.py`（Nacos 需在 8848 监听）。
 
 Cairn 插件：
 
@@ -216,7 +229,7 @@ cd dsh-cairn-search && npm test
 
 ## 范围与限制
 
-- 捕获 MVP：**只记录经代理的 HTTP(S)**，且只在 macOS 上实现围栏。
+- 捕获 MVP：**只记录经代理的 HTTP(S)**，支持 macOS 与 Linux。
 - 时间线不是 Scope 引擎，也不是全包 / DNS / 连接仓库。
 - 免费公开代理不是生产出口；测活通过也不等于稳定或合法。
 - DeepSeek Harness 处于开发者预览，接口可能不兼容升级。

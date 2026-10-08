@@ -98,7 +98,7 @@ class Settings:
 
     @property
     def capture_supported(self) -> bool:
-        return self.platform == "darwin"
+        return self.platform in {"darwin", "linux"}
 
     @property
     def capture_meta(self) -> dict:
