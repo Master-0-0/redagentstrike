@@ -1,6 +1,32 @@
 from dataclasses import replace
+from unittest.mock import Mock
+
+import pytest
 
 from workbench.harness import HarnessManager, _dsh_cmd, parse_ready_url
+
+
+@pytest.mark.parametrize("new_line,running,port_open,expected", [
+    (False, True, True, None),
+    (True, False, True, None),
+    (True, True, False, None),
+    (True, True, True, "http://127.0.0.1:3081/?token=new"),
+])
+def test_wait_ready_requires_current_launch_url_and_live_process(settings, tmp_path, monkeypatch, new_line, running, port_open, expected):
+    manager = HarnessManager(settings)
+    log = tmp_path / "dsh.log"
+    log.write_text("dsh web: http://127.0.0.1:3081/?token=old\n")
+    manager._log_start = log.stat().st_size
+    if new_line:
+        with log.open("a") as handle:
+            handle.write("dsh web: http://127.0.0.1:3081/?token=new\n")
+    manager.proc = Mock()
+    manager.proc.poll.return_value = None if running else 1
+    monkeypatch.setattr("workbench.harness._port_open", lambda *_: port_open)
+    monkeypatch.setattr("workbench.harness.time.sleep", lambda _: None)
+    ticks = iter([0, 0, 2])
+    monkeypatch.setattr("workbench.harness.time.time", lambda: next(ticks))
+    assert manager._wait_ready(log, timeout=1) == expected
 
 
 def test_parse_ready_url_strips_lan_suffix():

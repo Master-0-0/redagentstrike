@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from typing import Any, Dict, Optional
+from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -16,6 +17,8 @@ ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.abspath(os.path.join(ADDON_DIR, "..", "src"))
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
+
+from workbench.host_policy import blocked_reason, load_policy, matches, normalize_host
 
 try:
     from workbench.redact import decode_body, header_map, host_from_url  # type: ignore
@@ -42,6 +45,30 @@ STATUS = os.environ.get(
     INGEST.split("/internal/", 1)[0] + "/capture" if "/internal/" in INGEST else "http://127.0.0.1:8787/capture",
 )
 RUN_ID = os.environ.get("WORKBENCH_RUN_ID") or None
+
+
+def _apply_host_policy(flow) -> bool:
+    flow.metadata["host_policy_whitelisted"] = False
+    path = os.environ.get("WORKBENCH_HOST_POLICY")
+    if not path or _local_control(flow):
+        return False
+    try:
+        policy = load_policy(Path(path))
+        host = normalize_host(flow.request.host)
+        reason = blocked_reason(host, policy)
+        flow.metadata["host_policy_whitelisted"] = not reason and any(
+            matches(host, rule) for rule in policy['whitelist']
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        reason = '无法读取 host 黑白名单配置'
+    if not reason:
+        return False
+    from mitmproxy import http
+    flow.response = http.Response.make(
+        403, (reason + '\n').encode('utf-8'),
+        {'Content-Type': 'text/plain; charset=utf-8', 'X-Workbench-Blocked': 'host-policy'},
+    )
+    return True
 
 
 def _headers(flow_headers) -> Dict[str, str]:
@@ -239,6 +266,8 @@ def _apply_decision(flow, decision: Dict[str, Any]) -> None:
 
 class HttpCapture:
     def http_connect(self, flow) -> None:
+        if _apply_host_policy(flow):
+            return
         _apply_egress(flow)
 
     def request(self, flow) -> None:
@@ -246,8 +275,12 @@ class HttpCapture:
         method = (request.method or "").upper()
         if method == "CONNECT":
             return
+        if _apply_host_policy(flow):
+            return
         _apply_egress(flow)
         host = (request.host or "").lower()
+        if flow.metadata.get("host_policy_whitelisted"):
+            return
         if host in {"127.0.0.1", "localhost"} and request.port in {8787, 5173}:
             return
         status = _json_get(STATUS, timeout=0.4)
@@ -267,11 +300,18 @@ class HttpCapture:
         if not decision:
             return
         _apply_decision(flow, decision)
+        # An intercepted request may have been edited to point at a different host.
+        if (decision.get("action") or "forward") == "forward":
+            _apply_host_policy(flow)
 
     def response(self, flow) -> None:
+        if flow.metadata.get("host_policy_whitelisted"):
+            return
         _ingest(flow, failed=False)
 
     def error(self, flow) -> None:
+        if flow.metadata.get("host_policy_whitelisted"):
+            return
         _ingest(flow, failed=True)
 
 

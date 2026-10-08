@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  attachHarness,
   clearNetwork,
   dropHold,
   fetchNetwork,
@@ -12,6 +13,7 @@ import {
   setIntercept,
 } from './api'
 import { persistDshUrl } from '../dshUrl'
+import { HostPolicySettings } from './HostPolicySettings'
 import type { EmptyKind, NetworkEvent, NetworkPayload, ReplayResult, RequestDraft } from './types'
 
 const EMPTY_COPY: Record<Exclude<EmptyKind, null>, { title: string; body: string }> = {
@@ -37,6 +39,8 @@ export function NetworkTimeline() {
   const [payload, setPayload] = useState<NetworkPayload | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [attaching, setAttaching] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [holdDraft, setHoldDraft] = useState<RequestDraft>(EMPTY_DRAFT)
   const [repeater, setRepeater] = useState<RequestDraft>(EMPTY_DRAFT)
@@ -121,6 +125,25 @@ export function NetworkTimeline() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '无法切换捕获')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const onAttachHarness = async () => {
+    setBusy(true)
+    setAttaching(true)
+    setNotice('正在注入代理配置并重启工作台…')
+    try {
+      const result = await attachHarness()
+      syncHarnessUrl(result.capture)
+      setPayload((current) => current ? { ...current, capture: result.capture } : current)
+      setNotice(result.error
+        ? captureErrorText(result.error)
+        : '工作台已接入代理，代理配置与 CA 已注入。')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '工作台接入失败')
+    } finally {
+      setAttaching(false)
       setBusy(false)
     }
   }
@@ -252,6 +275,7 @@ export function NetworkTimeline() {
       </header>
 
       <div className="nt-toolbar">
+        <button type="button" className="btn-ghost" onClick={() => setSettingsOpen(true)}>设置</button>
         <button
           type="button"
           className={listening ? 'btn-primary' : 'btn-ghost'}
@@ -268,6 +292,20 @@ export function NetworkTimeline() {
         >
           {interceptOn ? '拦截 开' : '拦截 关'}
         </button>
+        {payload?.capture.harness?.managed && (
+          <>
+            <button
+              type="button"
+              className="btn-ghost"
+              title="接入会重启工作台，可能中断正在执行的任务"
+              disabled={busy || apiUp !== 'up' || !listening || payload.capture.harness.proxied}
+              onClick={() => void onAttachHarness()}
+            >
+              {attaching ? '正在接入…' : payload.capture.harness.proxied ? '工作台已接入' : '接入工作台'}
+            </button>
+            {!listening && <span className="nt-muted">先开启捕获，再接入工作台</span>}
+          </>
+        )}
         <label className="nt-grow">
           host
           <input value={host} onChange={(event) => setHost(event.target.value)} placeholder="过滤主机名" />
@@ -275,6 +313,7 @@ export function NetworkTimeline() {
       </div>
 
       {notice && <p className="nt-notice">{notice}</p>}
+      {settingsOpen && <HostPolicySettings onClose={() => setSettingsOpen(false)} />}
 
       {pending && (
         <section className="nt-intercept">
@@ -599,6 +638,9 @@ function statusClass(event: NetworkEvent): string {
 }
 
 function captureErrorText(code: string): string {
+  if (code === 'capture_not_running') return '捕获尚未开启，请先开启捕获再接入工作台。'
+  if (code === 'dsh_unmanaged') return '当前工作台未由控制面管理，无法自动注入代理配置。'
+  if (code === 'dsh_proxy_not_ready') return '工作台尚未接入代理，请检查工作台启动日志后重试。'
   if (code === 'mitmproxy_missing') return '未找到 mitmdump。安装 mitmproxy 后才能真正抓到经代理的流量。'
   if (code === 'capture_macos_only') return 'MVP 仅支持 macOS 捕获。'
   if (code === 'mitm_start_timeout') return 'mitm 启动超时，检查 8088 端口是否被占用。'
@@ -607,7 +649,7 @@ function captureErrorText(code: string): string {
   if (code === 'dsh_runtime_missing') return '本机没有 pnpm/node，无法重启 Agent 工作台以注入代理。'
   if (code === 'dsh_start_timeout') return 'Agent 工作台重启超时。捕获已开，但工作台可能还没走代理。'
   if (code.startsWith('dsh_spawn_failed')) return '无法启动 Agent 工作台：' + code
-  return `捕获未启动：${code}`
+  return `操作失败：${code}`
 }
 
 function syncHarnessUrl(capture: NetworkPayload['capture']): void {

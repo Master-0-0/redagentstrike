@@ -20,6 +20,7 @@ from .control import ControlPlane, new_id, utcnow
 from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
 from .intercept import HoldBoard, ReplayCache
 from .harness import HarnessManager
+from .host_policy import load_policy, save_policy
 from .join import align_tool_call
 from .mitm import MitmManager
 from .netstore import HttpEvent, NetStore
@@ -66,6 +67,11 @@ class ProbeBody(BaseModel):
 
 class CaptureToggle(BaseModel):
     enabled: bool
+
+
+class HostPolicyBody(BaseModel):
+    whitelist: str = Field(default="", max_length=100_000)
+    blacklist: str = Field(default="", max_length=100_000)
 
 
 class InterceptToggle(BaseModel):
@@ -433,6 +439,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             except RuntimeError as exc:
                 capture_error = str(exc)
                 st.control.mark_capture_started(run.id, False)
+            else:
+                capture_error = _apply_harness(st, True)
         stored = st.control.get_run(run.id) or run
         return {
             "run": stored.as_dict(),
@@ -447,8 +455,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="run_not_found")
         st.poc_recorder.invalidate()
         st.mitm.stop()
+        capture_error = _apply_harness(st, False)
         run = st.control.end_run(run_id)
-        return {"run": run.as_dict(), "capture": st.mitm.status()}
+        return {"run": run.as_dict(), "capture": st.mitm.status(), "capture_error": capture_error}
 
     @app.post("/runs/{run_id}/events")
     def add_event(run_id: str, body: ToolCallBody) -> Dict[str, Any]:
@@ -717,6 +726,36 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "run": (session_run().as_dict() if session_run() else None),
             "error": error,
         }
+
+    @app.get("/capture/hosts")
+    def get_host_policy() -> Dict[str, Any]:
+        try:
+            return load_policy(state().settings.host_policy_path)
+        except (OSError, ValueError, KeyError, TypeError):
+            raise HTTPException(status_code=503, detail="无法读取 host 黑白名单配置")
+
+    @app.put("/capture/hosts")
+    def put_host_policy(body: HostPolicyBody) -> Dict[str, Any]:
+        try:
+            return save_policy(state().settings.host_policy_path, body.whitelist, body.blacklist)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except OSError:
+            raise HTTPException(status_code=503, detail="无法保存 host 黑白名单配置")
+
+    @app.post("/capture/harness")
+    def attach_harness() -> Dict[str, Any]:
+        st = state()
+        if not st.settings.manage_dsh:
+            error = "dsh_unmanaged"
+        elif not st.mitm.listening:
+            error = "capture_not_running"
+        else:
+            error = _apply_harness(st, True)
+        capture = capture_blob()
+        if error is None and not capture["harness"]["proxied"]:
+            error = "dsh_proxy_not_ready"
+        return {"capture": capture, "error": error}
 
     @app.post("/capture/intercept")
     def set_intercept(body: InterceptToggle) -> Dict[str, Any]:

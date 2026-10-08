@@ -49,6 +49,10 @@ class Settings:
         return self.data_dir / "control.sqlite"
 
     @property
+    def host_policy_path(self) -> Path:
+        return self.data_dir / "host-policy.json"
+
+    @property
     def net_db(self) -> Path:
         return self.data_dir / "net.duckdb"
 

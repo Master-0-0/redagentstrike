@@ -37,6 +37,7 @@ class HarnessManager:
         self.last_error: Optional[str] = None
         self._injected = False
         self._log_handle = None
+        self._log_start = 0
 
     def status(self) -> dict:
         pid = self._listen_pid()
@@ -94,6 +95,7 @@ class HarnessManager:
         self.settings.data_dir.mkdir(parents=True, exist_ok=True)
         self._close_log()
         self._log_handle = open(log_path, "ab")
+        self._log_start = self._log_handle.tell()
         try:
             self.proc = subprocess.Popen(
                 cmd,
@@ -118,12 +120,12 @@ class HarnessManager:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self.proc is not None and self.proc.poll() is not None:
-                return parse_ready_url(_tail(log_path, 8000))
-            found = parse_ready_url(_tail(log_path, 8000))
+                return None
+            found = parse_ready_url(_tail(log_path, 8000, start=self._log_start))
             if found and _port_open(self.settings.dsh_host, self.settings.dsh_port):
                 return found
             time.sleep(0.2)
-        return parse_ready_url(_tail(log_path, 8000))
+        return None
 
     def _url_from_log(self) -> Optional[str]:
         return parse_ready_url(_tail(self.settings.data_dir / "dsh-web.log", 8000))
@@ -277,9 +279,12 @@ def _port_open(host: str, port: int) -> bool:
         sock.close()
 
 
-def _tail(path: Path, limit: int = 4000) -> str:
+def _tail(path: Path, limit: int = 4000, start: int = 0) -> str:
     try:
-        data = path.read_bytes()[-limit:]
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            handle.seek(max(start, handle.tell() - limit))
+            data = handle.read()
     except OSError:
         return ""
     return data.decode("utf-8", errors="replace")
