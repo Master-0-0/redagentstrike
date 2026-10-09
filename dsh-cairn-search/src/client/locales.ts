@@ -3,6 +3,18 @@
 export const NS = 'blackboard'
 
 export const zh = {
+  'canvas.hint': '点击节点查看完整内容',
+  'canvas.zoomOut': '缩小',
+  'canvas.zoomIn': '放大',
+  'canvas.actualSize': '原始大小',
+  'canvas.fit': '适应画布',
+  'kind.intent': '意图',
+  'intent.open': '待执行',
+  'intent.claimed': '执行中',
+  'intent.concluded': '已完成',
+  'intent.complete': '已证明目标',
+  'intent.closed': '已关闭',
+  'kind.closed': '已关闭',
   'panel.trigger': '画板',
   'panel.title': '画板',
   'panel.aria': '画板，{status}',
@@ -35,6 +47,18 @@ export const zh = {
 } as const
 
 export const en: Record<BlackboardKey, string> = {
+  'canvas.hint': 'Select a node to see details',
+  'canvas.zoomOut': 'Zoom out',
+  'canvas.zoomIn': 'Zoom in',
+  'canvas.actualSize': 'Actual size',
+  'canvas.fit': 'Fit view',
+  'kind.intent': 'Intent',
+  'intent.open': 'Pending',
+  'intent.claimed': 'In progress',
+  'intent.concluded': 'Completed',
+  'intent.complete': 'Goal proven',
+  'intent.closed': 'Closed',
+  'kind.closed': 'Closed',
   'panel.trigger': 'Blackboard',
   'panel.title': 'Blackboard',
   'panel.aria': 'Blackboard, {status}',

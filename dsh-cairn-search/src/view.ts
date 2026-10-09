@@ -6,13 +6,13 @@
 import type { Board, Fact, Hint, Intent, ProjectStatus, ReasonLease } from './types.ts'
 import { GOAL_ID, ORIGIN_ID } from './types.ts'
 
-const NODE_WIDTH = 168
-const NODE_HEIGHT = 56
-const OPEN_WIDTH = 168
-const OPEN_HEIGHT = 44
-const COLUMN_GAP = 64
-const ROW_GAP = 20
-const PAD = 28
+const NODE_WIDTH = 240
+const NODE_HEIGHT = 144
+const INTENT_WIDTH = 240
+const INTENT_HEIGHT = 144
+const COLUMN_GAP = 88
+const ROW_GAP = 32
+const PAD = 40
 
 /** One fact or origin/goal node on the canvas. */
 export interface GraphNode {
@@ -26,7 +26,7 @@ export interface GraphNode {
   readonly height: number
 }
 
-/** One intent drawn as a path; `to` is null while the intent is still open. */
+/** One intent relationship; `to` is null while the intent is still open. */
 export interface GraphEdge {
   readonly id: string
   readonly from: readonly string[]
@@ -37,9 +37,9 @@ export interface GraphEdge {
   readonly creator: string
 }
 
-/** Open-intent stub sitting to the right of its sources until `to` is written. */
-export interface GraphStub {
-  readonly closed?: boolean
+/** An intent card retained through every lifecycle state, including completion. */
+export interface GraphIntent {
+  readonly status: GraphEdge['status']
   readonly id: string
   readonly intentId: string
   readonly description: string
@@ -57,7 +57,7 @@ export interface BoardView {
   readonly bootstrapEnabled: boolean
   readonly nodes: readonly GraphNode[]
   readonly edges: readonly GraphEdge[]
-  readonly stubs: readonly GraphStub[]
+  readonly intents: readonly GraphIntent[]
   readonly hints: readonly Hint[]
   readonly reason: ReasonLease | null
   readonly factCount: number
@@ -152,16 +152,16 @@ export function layoutBoard(board: Board): BoardView {
     visiting.add(id)
     const incoming = board.intents.filter((intent) => intent.to === id)
     const col = incoming.length === 0
-      ? 1
-      : 1 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
+      ? 2
+      : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
     visiting.delete(id)
     columns.set(id, col)
     return col
   }
   for (const fact of board.facts) columnOf(fact.id)
-  const factColumns = board.facts.map((fact) => columns.get(fact.id) ?? 1)
+  const factColumns = board.facts.filter((fact) => fact.id !== GOAL_ID).map((fact) => columns.get(fact.id) ?? 1)
   const maxFactCol = factColumns.length === 0 ? 0 : Math.max(...factColumns)
-  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 1, maxFactCol + 1))
+  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 2, maxFactCol + 2))
 
   const byColumn = new Map<number, string[]>()
   for (const fact of board.facts) {
@@ -173,7 +173,6 @@ export function layoutBoard(board: Board): BoardView {
 
   const factById = new Map(board.facts.map((fact) => [fact.id, fact]))
   const nodes: GraphNode[] = []
-  const nodeAt = new Map<string, GraphNode>()
   let maxCol = 0
   let maxBottom = 0
   for (const [col, ids] of [...byColumn.entries()].sort((a, b) => a[0] - b[0])) {
@@ -192,7 +191,6 @@ export function layoutBoard(board: Board): BoardView {
         height: NODE_HEIGHT,
       }
       nodes.push(node)
-      nodeAt.set(id, node)
       maxBottom = Math.max(maxBottom, node.y + node.height)
     })
   }
@@ -207,35 +205,44 @@ export function layoutBoard(board: Board): BoardView {
     creator: intent.creator,
   }))
 
-  const stubs: GraphStub[] = []
-  const openByColumn = new Map<number, GraphEdge[]>()
+  const intents: GraphIntent[] = []
+  const intentByColumn = new Map<number, GraphEdge[]>()
   for (const edge of edges) {
-    if (edge.to !== null) continue
     const fromCols = edge.from.map((id) => columns.get(id) ?? 0)
     const col = (fromCols.length === 0 ? 0 : Math.max(...fromCols)) + 1
-    const list = openByColumn.get(col) ?? []
+    const list = intentByColumn.get(col) ?? []
     list.push(edge)
-    openByColumn.set(col, list)
+    intentByColumn.set(col, list)
   }
-  for (const [col, list] of openByColumn) {
+  for (const [col, list] of intentByColumn) {
     maxCol = Math.max(maxCol, col)
     const occupied = (byColumn.get(col) ?? []).length
     list.forEach((edge, index) => {
-      const stub: GraphStub = {
-        id: `open:${edge.id}`,
+      const stub: GraphIntent = {
+        id: `intent:${edge.id}`,
         intentId: edge.id,
-        closed: edge.status === 'closed',
+        status: edge.status,
         description: edge.description,
         worker: edge.worker,
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + (occupied + index) * (NODE_HEIGHT + ROW_GAP),
-        width: OPEN_WIDTH,
-        height: OPEN_HEIGHT,
+        width: INTENT_WIDTH,
+        height: INTENT_HEIGHT,
       }
-      stubs.push(stub)
+      intents.push(stub)
       maxBottom = Math.max(maxBottom, stub.y + stub.height)
     })
   }
+
+  // Center short columns against the tallest branch, including pending intents.
+  const bottomByX = new Map<number, number>()
+  for (const item of [...nodes, ...intents]) {
+    bottomByX.set(item.x, Math.max(bottomByX.get(item.x) ?? 0, item.y + item.height))
+  }
+  const centered = <T extends GraphNode | GraphIntent>(item: T): T => ({
+    ...item,
+    y: item.y + (maxBottom - (bottomByX.get(item.x) ?? maxBottom)) / 2,
+  })
 
   const openCount = board.intents.filter((intent) => intent.to === null && !intent.closed).length
   const claimedCount = board.intents.filter((intent) => intent.to === null && !intent.closed && intent.worker !== null).length
@@ -243,9 +250,9 @@ export function layoutBoard(board: Board): BoardView {
     title: board.title,
     status: board.status,
     bootstrapEnabled: board.bootstrapEnabled,
-    nodes,
+    nodes: nodes.map(centered),
     edges,
-    stubs,
+    intents: intents.map(centered),
     hints: board.hints,
     reason: board.reason,
     factCount: board.facts.length,

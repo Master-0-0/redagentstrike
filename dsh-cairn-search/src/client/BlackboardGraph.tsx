@@ -1,9 +1,9 @@
 /** SVG origin→goal graph for one blackboard snapshot. */
 
-import type { BoardView, GraphEdge, GraphNode, GraphStub } from '../view.ts'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { BoardView, GraphEdge, GraphNode, GraphIntent } from '../view.ts'
 import { edgePath } from '../view.ts'
 
-const ELLIPSIS = '…'
 
 export interface BlackboardGraphProps {
   readonly view: BoardView
@@ -13,36 +13,68 @@ export interface BlackboardGraphProps {
 }
 
 /**
- * Render the fact-intent graph. Nodes and open stubs are selectable.
+ * Render the fact-intent graph. Facts and all intents are selectable.
  * @param props - laid-out board plus selection.
  */
 export function BlackboardGraph({ view, selectedId, onSelect, t }: BlackboardGraphProps) {
+  const viewport = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState<number | null>(1)
+  const [availableWidth, setAvailableWidth] = useState(560)
+  const markerId = useId().replace(/:/g, '')
+  useEffect(() => {
+    const element = viewport.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const scale = zoom ?? Math.min(1, Math.max(0.2, availableWidth / view.width))
   const byId = new Map(view.nodes.map((node) => [node.id, node]))
-  const stubByIntent = new Map(view.stubs.map((stub) => [stub.intentId, stub]))
+  const cardByIntent = new Map(view.intents.map((stub) => [stub.intentId, stub]))
   return (
-    <div className="dsh-bb-canvas">
+    <div className="dsh-bb-graph">
+      <div className="dsh-bb-toolbar">
+        <span>{t('canvas.hint')}</span>
+        <div className="dsh-bb-zoom">
+          <button type="button" aria-label={t('canvas.zoomOut')} disabled={scale <= 0.2} onClick={() => setZoom(Math.max(0.2, scale - 0.15))}>−</button>
+          <button type="button" aria-label={t('canvas.actualSize')} onClick={() => setZoom(1)}>{Math.round(scale * 100)}%</button>
+          <button type="button" aria-label={t('canvas.zoomIn')} disabled={scale >= 2} onClick={() => setZoom(Math.min(2, scale + 0.15))}>+</button>
+          <button type="button" onClick={() => setZoom(null)}>{t('canvas.fit')}</button>
+        </div>
+      </div>
+      <div className="dsh-bb-canvas" ref={viewport}>
+
       <svg
-        width={view.width}
-        height={view.height}
+        width={view.width * scale}
+        height={view.height * scale}
         viewBox={`0 0 ${view.width} ${view.height}`}
-        role="img"
+        role="group"
         aria-label={view.title}
       >
+        <defs>
+          <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="context-stroke" strokeWidth="1.5" />
+          </marker>
+        </defs>
         {view.edges.flatMap((edge) => {
-          const dest = edge.to === null ? stubByIntent.get(edge.id) : byId.get(edge.to)
-          if (dest === undefined) return []
-          return edge.from.flatMap((fromId) => {
+          const intent = cardByIntent.get(edge.id)
+          if (intent === undefined) return []
+          const highlighted = edge.from.includes(selectedId ?? '') || edge.to === selectedId || intent.id === selectedId
+          const segments = edge.from.flatMap((fromId) => {
             const source = byId.get(fromId)
-            if (source === undefined) return []
-            return [
-              <path
-                key={`${edge.id}:${fromId}`}
-                className="dsh-bb-edge"
-                data-status={edge.status}
-                d={edgePath(source, dest)}
-              />,
-            ]
+            return source ? [{ key: fromId, source, dest: intent, kind: 'source' }] : []
           })
+          const output = edge.to === null ? undefined : byId.get(edge.to)
+          return [
+            ...segments.map(({ key, source, dest, kind }) => (
+              <path key={`${edge.id}:${key}`} className="dsh-bb-edge" data-status={edge.status}
+                data-relation={kind} data-highlighted={highlighted || undefined}
+                markerEnd={`url(#${markerId})`} d={edgePath(source, dest)} />
+            )),
+            output && <path key={`${edge.id}:output`} className="dsh-bb-edge" data-status={edge.status}
+              data-relation="output" data-highlighted={highlighted || undefined}
+              markerEnd={`url(#${markerId})`} d={edgePath(intent, output)} />,
+          ]
         })}
         {view.nodes.map((node) => (
           <NodeCard
@@ -53,15 +85,18 @@ export function BlackboardGraph({ view, selectedId, onSelect, t }: BlackboardGra
             onSelect={onSelect}
           />
         ))}
-        {view.stubs.map((stub) => (
-          <StubCard
+        {view.intents.map((stub) => (
+          <IntentCard
             key={stub.id}
             stub={stub}
             selected={selectedId === stub.id}
             onSelect={onSelect}
+            kicker={t('kind.intent')}
+            statusLabel={t(`intent.${stub.status}`)}
           />
         ))}
       </svg>
+      </div>
     </div>
   )
 }
@@ -81,6 +116,11 @@ function NodeCard({
       data-superseded={!!node.supersededBy?.length || undefined}
       data-selected={selected || undefined}
       transform={`translate(${node.x} ${node.y})`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${kicker}: ${node.description}`}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(node.id) } }}
       onClick={() => { onSelect(node.id) }}
     >
       <title>{`${kicker} ${node.id}: ${node.description}`}</title>
@@ -88,27 +128,35 @@ function NodeCard({
         className="dsh-bb-node-card"
         width={node.width}
         height={node.height}
-        rx={8}
+        rx={12}
       />
-      <text className="dsh-bb-node-id" x={10} y={18}>{truncate(`${kicker} · ${node.id}`, 22)}</text>
-      <text className="dsh-bb-node-text" x={10} y={36}>{truncate(node.description, 22)}</text>
+      <CardContent width={node.width} height={node.height} kicker={kicker} id={node.id} description={node.description} />
     </g>
   )
 }
 
-function StubCard({
-  stub, selected, onSelect,
+function IntentCard({
+  stub, selected, onSelect, kicker, statusLabel,
 }: {
-  stub: GraphStub
+  stub: GraphIntent
+  statusLabel: string
+  kicker: string
   selected: boolean
   onSelect: (id: string) => void
 }) {
   return (
     <g
-      className="dsh-bb-node dsh-bb-stub"
+      className="dsh-bb-node dsh-bb-intent"
+      data-kind="intent"
+      data-status={stub.status}
       data-selected={selected || undefined}
-      data-closed={stub.closed || undefined}
+      data-closed={stub.status === 'closed' || undefined}
       transform={`translate(${stub.x} ${stub.y})`}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`${kicker} ${stub.intentId} · ${statusLabel}: ${stub.description}`}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(stub.id) } }}
       onClick={() => { onSelect(stub.id) }}
     >
       <title>{stub.description}</title>
@@ -116,10 +164,9 @@ function StubCard({
         className="dsh-bb-node-card"
         width={stub.width}
         height={stub.height}
-        rx={8}
+        rx={12}
       />
-      <text className="dsh-bb-node-id" x={10} y={16}>{truncate(stub.intentId, 22)}</text>
-      <text className="dsh-bb-node-text" x={10} y={32}>{truncate(stub.description, 22)}</text>
+      <CardContent width={stub.width} height={stub.height} kicker={kicker} id={stub.intentId} description={stub.description} statusLabel={statusLabel} />
     </g>
   )
 }
@@ -138,7 +185,7 @@ export function selectedDetail(
   if (node !== undefined) {
     return { kicker: node.id, body: node.supersededBy?.length ? `${node.description}\n\nSuperseded by: ${node.supersededBy.join(', ')}` : node.description }
   }
-  const stub = view.stubs.find((item) => item.id === selectedId)
+  const stub = view.intents.find((item) => item.id === selectedId)
   if (stub !== undefined) {
     const edge = view.edges.find((item) => item.id === stub.intentId)
     return {
@@ -156,7 +203,16 @@ function describeEdge(edge: GraphEdge): string {
   return lines.join('\n')
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text
-  return `${text.slice(0, Math.max(0, max - 1))}${ELLIPSIS}`
+function CardContent({ width, height, kicker, id, description, statusLabel }: {
+  width: number; height: number; kicker: string; id: string; description: string; statusLabel?: string
+}) {
+  return (
+    <foreignObject width={width} height={height}>
+      <div className="dsh-bb-card-content">
+        <div className="dsh-bb-card-heading"><span>{kicker}</span><code>{id}</code></div>
+        <div className="dsh-bb-card-description">{description}</div>
+        {statusLabel && <span className="dsh-bb-intent-status">{statusLabel}</span>}
+      </div>
+    </foreignObject>
+  )
 }

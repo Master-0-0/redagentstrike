@@ -134,7 +134,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
       <header className="page-head blackboard-head">
         <div>
           <h1>画板展示</h1>
-          <p>从 DeepSeek Harness 工作区读取 <code>.dsh/blackboards</code> 里各会话的 fact-intent 图。</p>
+          <p>追踪每一次探索，串联事实与目标。</p>
         </div>
         <div className="blackboard-head-meta">
           <span>{catalog ? `${boardCount} 份画板` : loadingList ? '正在读取…' : '未连接'}</span>
@@ -222,6 +222,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
               </header>
               <div className="dsh-bb-body">
                 <BlackboardGraph
+                  key={selected ? selectionKey(selected.workspaceId, selected.ownerId) : "empty"}
                   view={view}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
@@ -231,7 +232,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
                   <span><span className="dsh-bb-swatch origin" />{t('legend.origin')}</span>
                   <span><span className="dsh-bb-swatch" />{t('legend.fact')}</span>
                   <span><span className="dsh-bb-swatch goal" />{t('legend.goal')}</span>
-                  <span><span className="dsh-bb-swatch open" />{t('legend.claimed')}</span>
+                  <span><span className="dsh-bb-swatch intent" />{t('kind.intent')}</span>
                 </div>
                 {detail !== undefined && (
                   <div className="dsh-bb-detail">

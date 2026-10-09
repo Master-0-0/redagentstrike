@@ -28,7 +28,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/client/BlackboardSidebarPanel.tsx
-var import_react = require("react");
+var import_react2 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/owner.ts
@@ -89,18 +89,21 @@ function lineageFromList(id, list) {
   };
 }
 
+// src/client/BlackboardGraph.tsx
+var import_react = require("react");
+
 // src/types.ts
 var ORIGIN_ID = "origin";
 var GOAL_ID = "goal";
 
 // src/view.ts
-var NODE_WIDTH = 168;
-var NODE_HEIGHT = 56;
-var OPEN_WIDTH = 168;
-var OPEN_HEIGHT = 44;
-var COLUMN_GAP = 64;
-var ROW_GAP = 20;
-var PAD = 28;
+var NODE_WIDTH = 240;
+var NODE_HEIGHT = 144;
+var INTENT_WIDTH = 240;
+var INTENT_HEIGHT = 144;
+var COLUMN_GAP = 88;
+var ROW_GAP = 32;
+var PAD = 40;
 function parseBoard(text) {
   let value;
   try {
@@ -163,15 +166,15 @@ function layoutBoard(board) {
     if (visiting.has(id)) return 1;
     visiting.add(id);
     const incoming = board.intents.filter((intent) => intent.to === id);
-    const col = incoming.length === 0 ? 1 : 1 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))));
+    const col = incoming.length === 0 ? 2 : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))));
     visiting.delete(id);
     columns.set(id, col);
     return col;
   };
   for (const fact of board.facts) columnOf(fact.id);
-  const factColumns = board.facts.map((fact) => columns.get(fact.id) ?? 1);
+  const factColumns = board.facts.filter((fact) => fact.id !== GOAL_ID).map((fact) => columns.get(fact.id) ?? 1);
   const maxFactCol = factColumns.length === 0 ? 0 : Math.max(...factColumns);
-  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 1, maxFactCol + 1));
+  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 2, maxFactCol + 2));
   const byColumn = /* @__PURE__ */ new Map();
   for (const fact of board.facts) {
     const col = columns.get(fact.id) ?? 1;
@@ -181,7 +184,6 @@ function layoutBoard(board) {
   }
   const factById = new Map(board.facts.map((fact) => [fact.id, fact]));
   const nodes = [];
-  const nodeAt = /* @__PURE__ */ new Map();
   let maxCol = 0;
   let maxBottom = 0;
   for (const [col, ids] of [...byColumn.entries()].sort((a, b) => a[0] - b[0])) {
@@ -200,7 +202,6 @@ function layoutBoard(board) {
         height: NODE_HEIGHT
       };
       nodes.push(node);
-      nodeAt.set(id, node);
       maxBottom = Math.max(maxBottom, node.y + node.height);
     });
   }
@@ -214,44 +215,51 @@ Closed: ${intent.closed.reason}` : intent.description,
     worker: intent.worker,
     creator: intent.creator
   }));
-  const stubs = [];
-  const openByColumn = /* @__PURE__ */ new Map();
+  const intents = [];
+  const intentByColumn = /* @__PURE__ */ new Map();
   for (const edge of edges) {
-    if (edge.to !== null) continue;
     const fromCols = edge.from.map((id) => columns.get(id) ?? 0);
     const col = (fromCols.length === 0 ? 0 : Math.max(...fromCols)) + 1;
-    const list = openByColumn.get(col) ?? [];
+    const list = intentByColumn.get(col) ?? [];
     list.push(edge);
-    openByColumn.set(col, list);
+    intentByColumn.set(col, list);
   }
-  for (const [col, list] of openByColumn) {
+  for (const [col, list] of intentByColumn) {
     maxCol = Math.max(maxCol, col);
     const occupied = (byColumn.get(col) ?? []).length;
     list.forEach((edge, index) => {
       const stub = {
-        id: `open:${edge.id}`,
+        id: `intent:${edge.id}`,
         intentId: edge.id,
-        closed: edge.status === "closed",
+        status: edge.status,
         description: edge.description,
         worker: edge.worker,
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + (occupied + index) * (NODE_HEIGHT + ROW_GAP),
-        width: OPEN_WIDTH,
-        height: OPEN_HEIGHT
+        width: INTENT_WIDTH,
+        height: INTENT_HEIGHT
       };
-      stubs.push(stub);
+      intents.push(stub);
       maxBottom = Math.max(maxBottom, stub.y + stub.height);
     });
   }
+  const bottomByX = /* @__PURE__ */ new Map();
+  for (const item of [...nodes, ...intents]) {
+    bottomByX.set(item.x, Math.max(bottomByX.get(item.x) ?? 0, item.y + item.height));
+  }
+  const centered = (item) => ({
+    ...item,
+    y: item.y + (maxBottom - (bottomByX.get(item.x) ?? maxBottom)) / 2
+  });
   const openCount = board.intents.filter((intent) => intent.to === null && !intent.closed).length;
   const claimedCount = board.intents.filter((intent) => intent.to === null && !intent.closed && intent.worker !== null).length;
   return {
     title: board.title,
     status: board.status,
     bootstrapEnabled: board.bootstrapEnabled,
-    nodes,
+    nodes: nodes.map(centered),
     edges,
-    stubs,
+    intents: intents.map(centered),
     hints: board.hints,
     reason: board.reason,
     factCount: board.facts.length,
@@ -328,60 +336,105 @@ function isRecord(value) {
 
 // src/client/BlackboardGraph.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
-var ELLIPSIS = "\u2026";
 function BlackboardGraph({ view, selectedId, onSelect, t }) {
+  const viewport = (0, import_react.useRef)(null);
+  const [zoom, setZoom] = (0, import_react.useState)(1);
+  const [availableWidth, setAvailableWidth] = (0, import_react.useState)(560);
+  const markerId = (0, import_react.useId)().replace(/:/g, "");
+  (0, import_react.useEffect)(() => {
+    const element = viewport.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const scale = zoom ?? Math.min(1, Math.max(0.2, availableWidth / view.width));
   const byId = new Map(view.nodes.map((node) => [node.id, node]));
-  const stubByIntent = new Map(view.stubs.map((stub) => [stub.intentId, stub]));
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-bb-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-    "svg",
-    {
-      width: view.width,
-      height: view.height,
-      viewBox: `0 0 ${view.width} ${view.height}`,
-      role: "img",
-      "aria-label": view.title,
-      children: [
-        view.edges.flatMap((edge) => {
-          const dest = edge.to === null ? stubByIntent.get(edge.id) : byId.get(edge.to);
-          if (dest === void 0) return [];
-          return edge.from.flatMap((fromId) => {
-            const source = byId.get(fromId);
-            if (source === void 0) return [];
+  const cardByIntent = new Map(view.intents.map((stub) => [stub.intentId, stub]));
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-graph", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-toolbar", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t("canvas.hint") }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-zoom", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": t("canvas.zoomOut"), disabled: scale <= 0.2, onClick: () => setZoom(Math.max(0.2, scale - 0.15)), children: "\u2212" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", "aria-label": t("canvas.actualSize"), onClick: () => setZoom(1), children: [
+          Math.round(scale * 100),
+          "%"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": t("canvas.zoomIn"), disabled: scale >= 2, onClick: () => setZoom(Math.min(2, scale + 0.15)), children: "+" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", onClick: () => setZoom(null), children: t("canvas.fit") })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-bb-canvas", ref: viewport, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "svg",
+      {
+        width: view.width * scale,
+        height: view.height * scale,
+        viewBox: `0 0 ${view.width} ${view.height}`,
+        role: "group",
+        "aria-label": view.title,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M 1 1 L 9 5 L 1 9", fill: "none", stroke: "context-stroke", strokeWidth: "1.5" }) }) }),
+          view.edges.flatMap((edge) => {
+            const intent = cardByIntent.get(edge.id);
+            if (intent === void 0) return [];
+            const highlighted = edge.from.includes(selectedId ?? "") || edge.to === selectedId || intent.id === selectedId;
+            const segments = edge.from.flatMap((fromId) => {
+              const source = byId.get(fromId);
+              return source ? [{ key: fromId, source, dest: intent, kind: "source" }] : [];
+            });
+            const output = edge.to === null ? void 0 : byId.get(edge.to);
             return [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              ...segments.map(({ key, source, dest, kind }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "path",
                 {
                   className: "dsh-bb-edge",
                   "data-status": edge.status,
+                  "data-relation": kind,
+                  "data-highlighted": highlighted || void 0,
+                  markerEnd: `url(#${markerId})`,
                   d: edgePath(source, dest)
                 },
-                `${edge.id}:${fromId}`
+                `${edge.id}:${key}`
+              )),
+              output && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "path",
+                {
+                  className: "dsh-bb-edge",
+                  "data-status": edge.status,
+                  "data-relation": "output",
+                  "data-highlighted": highlighted || void 0,
+                  markerEnd: `url(#${markerId})`,
+                  d: edgePath(intent, output)
+                },
+                `${edge.id}:output`
               )
             ];
-          });
-        }),
-        view.nodes.map((node) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          NodeCard,
-          {
-            node,
-            selected: selectedId === node.id,
-            kicker: node.supersededBy?.length ? t("kind.superseded") : t(`kind.${node.kind}`),
-            onSelect
-          },
-          node.id
-        )),
-        view.stubs.map((stub) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          StubCard,
-          {
-            stub,
-            selected: selectedId === stub.id,
-            onSelect
-          },
-          stub.id
-        ))
-      ]
-    }
-  ) });
+          }),
+          view.nodes.map((node) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            NodeCard,
+            {
+              node,
+              selected: selectedId === node.id,
+              kicker: node.supersededBy?.length ? t("kind.superseded") : t(`kind.${node.kind}`),
+              onSelect
+            },
+            node.id
+          )),
+          view.intents.map((stub) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            IntentCard,
+            {
+              stub,
+              selected: selectedId === stub.id,
+              onSelect,
+              kicker: t("kind.intent"),
+              statusLabel: t(`intent.${stub.status}`)
+            },
+            stub.id
+          ))
+        ]
+      }
+    ) })
+  ] });
 }
 function NodeCard({
   node,
@@ -397,6 +450,16 @@ function NodeCard({
       "data-superseded": !!node.supersededBy?.length || void 0,
       "data-selected": selected || void 0,
       transform: `translate(${node.x} ${node.y})`,
+      role: "button",
+      tabIndex: 0,
+      "aria-pressed": selected,
+      "aria-label": `${kicker}: ${node.description}`,
+      onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(node.id);
+        }
+      },
       onClick: () => {
         onSelect(node.id);
       },
@@ -408,27 +471,40 @@ function NodeCard({
             className: "dsh-bb-node-card",
             width: node.width,
             height: node.height,
-            rx: 8
+            rx: 12
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", { className: "dsh-bb-node-id", x: 10, y: 18, children: truncate(`${kicker} \xB7 ${node.id}`, 22) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", { className: "dsh-bb-node-text", x: 10, y: 36, children: truncate(node.description, 22) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardContent, { width: node.width, height: node.height, kicker, id: node.id, description: node.description })
       ]
     }
   );
 }
-function StubCard({
+function IntentCard({
   stub,
   selected,
-  onSelect
+  onSelect,
+  kicker,
+  statusLabel
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
     "g",
     {
-      className: "dsh-bb-node dsh-bb-stub",
+      className: "dsh-bb-node dsh-bb-intent",
+      "data-kind": "intent",
+      "data-status": stub.status,
       "data-selected": selected || void 0,
-      "data-closed": stub.closed || void 0,
+      "data-closed": stub.status === "closed" || void 0,
       transform: `translate(${stub.x} ${stub.y})`,
+      role: "button",
+      tabIndex: 0,
+      "aria-pressed": selected,
+      "aria-label": `${kicker} ${stub.intentId} \xB7 ${statusLabel}: ${stub.description}`,
+      onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(stub.id);
+        }
+      },
       onClick: () => {
         onSelect(stub.id);
       },
@@ -440,11 +516,10 @@ function StubCard({
             className: "dsh-bb-node-card",
             width: stub.width,
             height: stub.height,
-            rx: 8
+            rx: 12
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", { className: "dsh-bb-node-id", x: 10, y: 16, children: truncate(stub.intentId, 22) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", { className: "dsh-bb-node-text", x: 10, y: 32, children: truncate(stub.description, 22) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardContent, { width: stub.width, height: stub.height, kicker, id: stub.intentId, description: stub.description, statusLabel })
       ]
     }
   );
@@ -457,7 +532,7 @@ function selectedDetail(view, selectedId) {
 
 Superseded by: ${node.supersededBy.join(", ")}` : node.description };
   }
-  const stub = view.stubs.find((item) => item.id === selectedId);
+  const stub = view.intents.find((item) => item.id === selectedId);
   if (stub !== void 0) {
     const edge = view.edges.find((item) => item.id === stub.intentId);
     return {
@@ -473,9 +548,15 @@ function describeEdge(edge) {
   if (edge.worker !== null) lines.push(`worker ${edge.worker}`);
   return lines.join("\n");
 }
-function truncate(text, max) {
-  if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(0, max - 1))}${ELLIPSIS}`;
+function CardContent({ width, height, kicker, id, description, statusLabel }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("foreignObject", { width, height, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-card-content", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-card-heading", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: kicker }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: id })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-bb-card-description", children: description }),
+    statusLabel && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "dsh-bb-intent-status", children: statusLabel })
+  ] }) });
 }
 
 // src/client/BlackboardSidebarPanel.tsx
@@ -491,7 +572,7 @@ function BlackboardSidebarPanel({
   const current = useSessions((state) => state.current);
   const byId = useSessions((state) => state.byId) ?? {};
   const catalogs = useSessions((state) => state.subagentsByParent);
-  const ownerId = (0, import_react.useMemo)(() => {
+  const ownerId = (0, import_react2.useMemo)(() => {
     try {
       return boardOwnerFromList({
         current,
@@ -503,14 +584,14 @@ function BlackboardSidebarPanel({
     }
   }, [byId, catalogs, current]);
   const ownerTitle = ownerId === void 0 ? void 0 : byId[ownerId]?.displayTitle;
-  const [open, setOpen] = (0, import_react.useState)(false);
-  const [anchor, setAnchor] = (0, import_react.useState)();
-  const [snapshot, setSnapshot] = (0, import_react.useState)();
-  const [selectedId, setSelectedId] = (0, import_react.useState)();
-  const rootRef = (0, import_react.useRef)(null);
-  const readRef = (0, import_react.useRef)(readBoard);
+  const [open, setOpen] = (0, import_react2.useState)(false);
+  const [anchor, setAnchor] = (0, import_react2.useState)();
+  const [snapshot, setSnapshot] = (0, import_react2.useState)();
+  const [selectedId, setSelectedId] = (0, import_react2.useState)();
+  const rootRef = (0, import_react2.useRef)(null);
+  const readRef = (0, import_react2.useRef)(readBoard);
   readRef.current = readBoard;
-  (0, import_react.useEffect)(() => {
+  (0, import_react2.useEffect)(() => {
     setSelectedId(void 0);
     if (!open || current === void 0 || ownerId === void 0) {
       setSnapshot(void 0);
@@ -534,7 +615,7 @@ function BlackboardSidebarPanel({
       window.clearInterval(timer);
     };
   }, [current, ownerId, open]);
-  (0, import_react.useLayoutEffect)(() => {
+  (0, import_react2.useLayoutEffect)(() => {
     if (!open) return;
     const place = () => {
       const rect = rootRef.current?.getBoundingClientRect();
@@ -637,8 +718,8 @@ function panelBody({
         t("legend.goal")
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch open" }),
-        t("legend.claimed")
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch intent" }),
+        t("kind.intent")
       ] })
     ] }),
     detail !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-detail", children: [
@@ -661,6 +742,18 @@ function BlackboardIcon({ size }) {
 // src/client/locales.ts
 var NS = "blackboard";
 var zh = {
+  "canvas.hint": "\u70B9\u51FB\u8282\u70B9\u67E5\u770B\u5B8C\u6574\u5185\u5BB9",
+  "canvas.zoomOut": "\u7F29\u5C0F",
+  "canvas.zoomIn": "\u653E\u5927",
+  "canvas.actualSize": "\u539F\u59CB\u5927\u5C0F",
+  "canvas.fit": "\u9002\u5E94\u753B\u5E03",
+  "kind.intent": "\u610F\u56FE",
+  "intent.open": "\u5F85\u6267\u884C",
+  "intent.claimed": "\u6267\u884C\u4E2D",
+  "intent.concluded": "\u5DF2\u5B8C\u6210",
+  "intent.complete": "\u5DF2\u8BC1\u660E\u76EE\u6807",
+  "intent.closed": "\u5DF2\u5173\u95ED",
+  "kind.closed": "\u5DF2\u5173\u95ED",
   "panel.trigger": "\u753B\u677F",
   "panel.title": "\u753B\u677F",
   "panel.aria": "\u753B\u677F\uFF0C{status}",
@@ -692,6 +785,18 @@ var zh = {
   "kind.fact": "\u4E8B\u5B9E"
 };
 var en = {
+  "canvas.hint": "Select a node to see details",
+  "canvas.zoomOut": "Zoom out",
+  "canvas.zoomIn": "Zoom in",
+  "canvas.actualSize": "Actual size",
+  "canvas.fit": "Fit view",
+  "kind.intent": "Intent",
+  "intent.open": "Pending",
+  "intent.claimed": "In progress",
+  "intent.concluded": "Completed",
+  "intent.complete": "Goal proven",
+  "intent.closed": "Closed",
+  "kind.closed": "Closed",
   "panel.trigger": "Blackboard",
   "panel.title": "Blackboard",
   "panel.aria": "Blackboard, {status}",
@@ -902,71 +1007,97 @@ var CSS = `
   font-size: 12px;
   line-height: 18px;
 }
-.dsh-bb-canvas {
-  width: 100%;
-  min-height: 180px;
-  border-radius: 8px;
-  background: transparent;
-  overflow: auto;
+.dsh-bb-graph {
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 14px;
+  overflow: hidden;
 }
-.dsh-bb-canvas svg {
-  display: block;
-}
-.dsh-bb-node {
-  cursor: pointer;
-}
-.dsh-bb-node:focus {
-  outline: none;
-}
-.dsh-bb-node-card {
-  fill: var(--dsw-alias-interactive-bg-hover);
-  stroke: var(--dsw-alias-border-l3);
-  stroke-width: 1;
-}
-.dsh-bb-node[data-kind="origin"] .dsh-bb-node-card {
-  stroke: var(--dsw-alias-state-business-primary);
-}
-.dsh-bb-node[data-kind="goal"] .dsh-bb-node-card {
-  stroke: var(--dsw-alias-state-success-primary);
-}
-.dsh-bb-node[data-selected] .dsh-bb-node-card {
-  stroke-width: 1.5;
-}
-.dsh-bb-node-id {
-  fill: var(--dsw-alias-label-tertiary);
-  font-size: 10px;
-}
-.dsh-bb-node-text {
-  fill: var(--dsw-alias-label-primary);
+.dsh-bb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
 }
-.dsh-bb-stub .dsh-bb-node-card {
-  fill: transparent;
-  stroke-dasharray: 3 2;
-  stroke: var(--dsw-alias-state-warn-primary);
+.dsh-bb-zoom { display: flex; align-items: center; gap: 3px; }
+.dsh-bb-zoom button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 9px;
+  min-height: 28px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
 }
-.dsh-bb-edge {
-  fill: none;
-  stroke: var(--dsw-alias-label-tertiary);
-  stroke-width: 1.25;
+.dsh-bb-zoom button:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh-bb-zoom button:disabled { opacity: .35; cursor: default; }
+.dsh-bb-canvas {
+  width: 100%;
+  min-height: 220px;
+  max-height: 55vh;
+  background-color: var(--dsw-specific-menu, #fff);
+  background-image: radial-gradient(var(--dsw-alias-border-l3) .8px, transparent .8px);
+  background-size: 20px 20px;
+  overflow: auto;
+  scrollbar-width: thin;
 }
-.dsh-bb-stub[data-closed="true"] .dsh-bb-node-id { text-decoration: line-through; }
-.dsh-bb-stub[data-closed="true"] { opacity: .5; }
+.dsh-bb-canvas svg { display: block; margin: 0 auto; }
+.dsh-bb-node { cursor: pointer; --bb-accent: var(--dsw-alias-label-secondary); }
+.dsh-bb-node[data-kind="origin"] { --bb-accent: var(--dsw-alias-state-business-primary); }
+.dsh-bb-node[data-kind="goal"] { --bb-accent: var(--dsw-alias-state-success-primary); }
+.dsh-bb-intent { --bb-accent: var(--dsw-alias-state-business-primary); }
+.dsh-bb-node:focus { outline: none; }
+.dsh-bb-node-card {
+  fill: var(--dsw-specific-menu, #fff);
+  stroke: var(--dsw-alias-border-l3);
+  stroke-width: 1;
+  filter: drop-shadow(0 2px 3px rgb(15 23 42 / 5%));
+  transition: stroke .15s, filter .15s;
+}
+.dsh-bb-node[data-kind="origin"] .dsh-bb-node-card,
+.dsh-bb-node[data-kind="goal"] .dsh-bb-node-card { stroke: var(--bb-accent); }
+.dsh-bb-node:hover .dsh-bb-node-card,
+.dsh-bb-node:focus-visible .dsh-bb-node-card,
+.dsh-bb-node[data-selected] .dsh-bb-node-card {
+  stroke: var(--bb-accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 3px 6px rgb(15 23 42 / 12%));
+}
+.dsh-bb-card-content { padding: 15px 17px; box-sizing: border-box; height: 100%; pointer-events: none; }
+.dsh-bb-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 11px; line-height: 16px; color: var(--bb-accent); font-weight: 600; }
+.dsh-bb-card-heading span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+.dsh-bb-card-heading code { font-size: 10px; color: var(--dsw-alias-label-tertiary); font-weight: 400; }
+.dsh-bb-card-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+.dsh-bb-node[data-kind="fact"] { --bb-accent: var(--dsw-alias-label-secondary); }
+.dsh-bb-node[data-kind="fact"] .dsh-bb-node-card { stroke: var(--bb-accent); }
+.dsh-bb-intent .dsh-bb-node-card {
+  fill: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, var(--dsw-specific-menu, #fff));
+  stroke: var(--bb-accent);
+  stroke-width: 2.5;
+  stroke-dasharray: 10 6;
+}
+.dsh-bb-intent:hover .dsh-bb-node-card,
+.dsh-bb-intent:focus-visible .dsh-bb-node-card,
+.dsh-bb-intent[data-selected] .dsh-bb-node-card { stroke-width: 3.5; }
+.dsh-bb-intent-status { display: inline-block; margin-top: 8px; padding: 1px 7px; border-radius: 8px; font-size: 10px; line-height: 16px; color: var(--bb-accent); background: var(--dsw-alias-interactive-bg-hover); }
+.dsh-bb-intent[data-status="concluded"] .dsh-bb-intent-status,
+.dsh-bb-intent[data-status="complete"] .dsh-bb-intent-status { color: var(--dsw-alias-state-success-primary); }
+.dsh-bb-edge[data-relation="output"] { stroke: var(--dsw-alias-state-warn-primary); }
+
+.dsh-bb-edge { fill: none; stroke: var(--dsw-alias-border-l3); stroke-width: 1.5; }
+.dsh-bb-intent[data-closed="true"] { opacity: .5; }
 .dsh-bb-node[data-superseded="true"] { opacity: .5; }
-.dsh-bb-edge[data-status="closed"] { stroke: #94a3b8; stroke-dasharray: 3 5; }
-.dsh-bb-edge[data-status="claimed"] {
-  stroke: var(--dsw-alias-state-warn-primary);
-  stroke-dasharray: 5 3;
-}
-.dsh-bb-edge[data-status="open"] {
-  stroke-dasharray: 3 3;
-}
-.dsh-bb-edge[data-status="complete"] {
-  stroke: var(--dsw-alias-state-success-primary);
-}
-.dsh-bb-edge[data-status="concluded"] {
-  stroke: var(--dsw-alias-label-secondary);
-}
+.dsh-bb-edge[data-status="closed"] { stroke-dasharray: 3 5; }
+.dsh-bb-edge[data-status="claimed"] { stroke: var(--dsw-alias-state-warn-primary); stroke-dasharray: 5 5; }
+.dsh-bb-edge[data-status="open"] { stroke-dasharray: 4 5; }
+.dsh-bb-edge[data-status="complete"] { stroke: var(--dsw-alias-state-success-primary); }
+.dsh-bb-edge[data-highlighted] { stroke: var(--dsw-alias-state-business-primary); stroke-width: 2.5; }
 .dsh-bb-legend {
   display: flex;
   flex-wrap: wrap;
@@ -985,6 +1116,8 @@ var CSS = `
   border: 1px solid var(--dsw-alias-border-l3);
   vertical-align: middle;
 }
+.dsh-bb-swatch.intent { border: 2px dashed var(--dsw-alias-state-business-primary); background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, var(--dsw-specific-menu, #fff)); width: 12px; height: 8px; }
+.dsh-bb-swatch:not(.origin):not(.goal):not(.intent):not(.open) { border-color: var(--dsw-alias-label-secondary); }
 .dsh-bb-swatch.origin { border-color: var(--dsw-alias-state-business-primary); }
 .dsh-bb-swatch.goal { border-color: var(--dsw-alias-state-success-primary); }
 .dsh-bb-swatch.open { border-color: var(--dsw-alias-state-warn-primary); border-style: dashed; }
@@ -1026,11 +1159,18 @@ var CSS = `
 `;
 function ensureStyles() {
   if (typeof document === "undefined") return;
-  if (document.getElementById(STYLE_ID)) return;
+  const existing = document.getElementById(STYLE_ID);
+  if (existing) {
+    if (existing.textContent !== CSS) existing.textContent = CSS;
+    return;
+  }
   const el = document.createElement("style");
   el.id = STYLE_ID;
   el.textContent = CSS;
   document.head.appendChild(el);
+}
+if (typeof document !== "undefined" && document.getElementById(STYLE_ID)) {
+  ensureStyles();
 }
 
 // src/client/index.ts
