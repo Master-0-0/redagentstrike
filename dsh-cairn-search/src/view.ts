@@ -17,6 +17,7 @@ const PAD = 28
 /** One fact or origin/goal node on the canvas. */
 export interface GraphNode {
   readonly id: string
+  readonly supersededBy?: readonly string[]
   readonly kind: 'origin' | 'goal' | 'fact'
   readonly description: string
   readonly x: number
@@ -31,13 +32,14 @@ export interface GraphEdge {
   readonly from: readonly string[]
   readonly to: string | null
   readonly description: string
-  readonly status: 'open' | 'claimed' | 'concluded' | 'complete'
+  readonly status: 'open' | 'claimed' | 'concluded' | 'complete' | 'closed'
   readonly worker: string | null
   readonly creator: string
 }
 
 /** Open-intent stub sitting to the right of its sources until `to` is written. */
 export interface GraphStub {
+  readonly closed?: boolean
   readonly id: string
   readonly intentId: string
   readonly description: string
@@ -89,7 +91,8 @@ export function parseBoard(text: string): Board | null {
   const facts: Fact[] = []
   for (const item of value.facts) {
     if (!isRecord(item) || typeof item.id !== 'string' || typeof item.description !== 'string') return null
-    facts.push({ id: item.id, description: item.description })
+    if (item.supersedes !== undefined && (!Array.isArray(item.supersedes) || item.supersedes.some(id => typeof id !== 'string'))) return null
+    facts.push({ id: item.id, description: item.description, ...(Array.isArray(item.supersedes) ? { supersedes: item.supersedes as string[] } : {}) })
   }
   const intents: Intent[] = []
   for (const item of value.intents) {
@@ -111,6 +114,7 @@ export function parseBoard(text: string): Board | null {
       content: item.content,
       creator: item.creator,
       createdAt: item.createdAt,
+      ...(typeof item.messageId === 'string' ? { messageId: item.messageId } : {}),
     })
   }
   const reason = parseReason(value.reason)
@@ -181,6 +185,7 @@ export function layoutBoard(board: Board): BoardView {
         id,
         kind: id === ORIGIN_ID ? 'origin' : id === GOAL_ID ? 'goal' : 'fact',
         description: fact.description,
+        supersededBy: board.facts.filter(f => f.supersedes?.includes(id)).map(f => f.id),
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
@@ -196,7 +201,7 @@ export function layoutBoard(board: Board): BoardView {
     id: intent.id,
     from: intent.from,
     to: intent.to,
-    description: intent.description,
+    description: intent.closed ? `${intent.description}\nClosed: ${intent.closed.reason}` : intent.description,
     status: edgeStatus(intent),
     worker: intent.worker,
     creator: intent.creator,
@@ -219,6 +224,7 @@ export function layoutBoard(board: Board): BoardView {
       const stub: GraphStub = {
         id: `open:${edge.id}`,
         intentId: edge.id,
+        closed: edge.status === 'closed',
         description: edge.description,
         worker: edge.worker,
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
@@ -231,8 +237,8 @@ export function layoutBoard(board: Board): BoardView {
     })
   }
 
-  const openCount = board.intents.filter((intent) => intent.to === null).length
-  const claimedCount = board.intents.filter((intent) => intent.to === null && intent.worker !== null).length
+  const openCount = board.intents.filter((intent) => intent.to === null && !intent.closed).length
+  const claimedCount = board.intents.filter((intent) => intent.to === null && !intent.closed && intent.worker !== null).length
   return {
     title: board.title,
     status: board.status,
@@ -296,6 +302,7 @@ export function edgePath(
 }
 
 function edgeStatus(intent: Intent): GraphEdge['status'] {
+  if (intent.closed) return 'closed'
   if (intent.to === GOAL_ID) return 'complete'
   if (intent.to !== null) return 'concluded'
   if (intent.worker !== null) return 'claimed'
@@ -310,7 +317,13 @@ function parseIntent(item: unknown): Intent | null {
   if (item.to !== null && typeof item.to !== 'string') return null
   if (item.worker !== null && typeof item.worker !== 'string') return null
   if (item.concludedAt !== null && typeof item.concludedAt !== 'string') return null
+  if (item.closed !== undefined && (!isRecord(item.closed) || typeof item.closed.reason !== 'string' || typeof item.closed.at !== 'string')) return null
   return {
+    ...(isRecord(item.closed) ? { closed: { reason: item.closed.reason as string, at: item.closed.at as string } } : {}),
+    ...(typeof item.target === 'string' ? { target: item.target } : {}),
+    ...(typeof item.dispatchId === 'string' ? { dispatchId: item.dispatchId } : {}),
+    ...(typeof item.subagentId === 'string' ? { subagentId: item.subagentId } : {}),
+    ...(item.pendingReturn === true ? { pendingReturn: true } : {}),
     id: item.id,
     from: item.from as string[],
     to: item.to,

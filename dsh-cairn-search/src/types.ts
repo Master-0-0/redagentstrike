@@ -5,6 +5,7 @@ export type ProjectStatus = 'active' | 'stopped' | 'completed'
 export interface Fact {
   readonly id: string
   readonly description: string
+  readonly supersedes?: readonly string[]
 }
 
 export interface Intent {
@@ -15,6 +16,11 @@ export interface Intent {
   readonly creator: string
   readonly worker: string | null
   readonly createdAt: string
+  readonly closed?: { readonly reason: string; readonly at: string }
+  readonly target?: string
+  readonly pendingReturn?: boolean
+  readonly dispatchId?: string
+  readonly subagentId?: string
   readonly concludedAt: string | null
 }
 
@@ -23,6 +29,7 @@ export interface Hint {
   readonly content: string
   readonly creator: string
   readonly createdAt: string
+  readonly messageId?: string
 }
 
 export interface ReasonLease {

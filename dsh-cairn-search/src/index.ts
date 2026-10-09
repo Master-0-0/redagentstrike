@@ -9,6 +9,8 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import {
   addHint,
+  closeIntent,
+  withBoardLock,
   claimIntent,
   concludeIntent,
   emptyBoard,
@@ -29,6 +31,8 @@ import {
   isConversationFork,
   type SessionLineage,
 } from './owner.ts'
+import { auditBoard } from './audit.ts'
+import { installRuntime, interruptWorkers } from './runtime.ts'
 import type { Board, Intent } from './types.ts'
 
 export const name = 'dsh-cairn-search'
@@ -44,6 +48,7 @@ const OPS = [
   'reason_finish',
   'hint',
   'release',
+  'close',
   'stop',
   'reopen',
 ] as const
@@ -57,6 +62,9 @@ const DESCRIPTION =
   + 'Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). '
   + 'Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). '
   + 'Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. '
+  + 'Use op=close with intentId and description to abandon or replace work without a fact. Use one target per intent and minimal direct from dependencies. '
+  + 'Spawn prompts must begin with blackboard_intent: iNNN after claim. Record one distilled conclusion, including negative findings; use supersedes for corrections. '
+  + 'Every mutation returns next; execute it before starting more exploration. Complete requires observed facts and no open intents. '
   + 'Do not hand-edit the board file. Policy refusals are not facts.'
 
 const INTENT_DRAFT = {
@@ -69,6 +77,7 @@ const INTENT_DRAFT = {
       items: { type: 'string' },
       description: 'Fact ids this intent explores from. Must be non-empty and must not include goal.',
     },
+    target: { type: 'string', required: true, description: 'One stable subgoal key. Open intents with the same target are rejected.' },
     description: {
       type: 'string',
       required: true,
@@ -88,7 +97,8 @@ const HOST_UI_ENTRY_ID = 'cairn-search-ui'
  */
 export function apply(ctx: Context): void {
   if (isHostUiInsert(ctx)) return
-  ctx.tools.register(defineTool({
+  installRuntime(ctx, exec => boardTarget(ctx, exec))
+  ctx.effect(() => ctx.tools.register(defineTool({
     name: 'blackboard',
     description: DESCRIPTION,
     parameters: {
@@ -109,6 +119,7 @@ export function apply(ctx: Context): void {
       intentId: { type: 'string', description: 'Intent id (op=claim, conclude, release).' },
       worker: { type: 'string', description: 'Worker label (op=claim, conclude, reason_start, reason_finish).' },
       description: { type: 'string', description: 'Fact text (op=conclude).' },
+      supersedes: { type: 'array', items: { type: 'string' }, description: 'Prior fact IDs replaced by this conclusion; preserve their history.' },
       content: { type: 'string', description: 'Hint text (op=hint).' },
       creator: { type: 'string', description: 'Hint author; defaults to user (op=hint).' },
       complete: {
@@ -143,6 +154,7 @@ export function apply(ctx: Context): void {
           ok: { type: 'boolean', required: true },
           op: { type: 'string', required: true },
           board: { type: 'json', description: 'Current board snapshot.' },
+          warnings: { type: 'json', description: 'Quality and recovery diagnostics.' },
           next: { type: 'json', description: 'Next dispatcher task.' },
           fact: { type: 'json', description: 'Fact written by conclude.' },
           hint: { type: 'json', description: 'Hint written by hint.' },
@@ -156,88 +168,110 @@ export function apply(ctx: Context): void {
     async execute(args, exec) {
       const target = boardTarget(ctx, exec)
       const { cwd, ownerId } = target
-      switch (args.op) {
-        case 'init': {
-          const board = ensureBootstrapIntent(emptyBoard(
-            required(args.title, 'title'),
-            required(args.origin, 'origin'),
-            required(args.goal, 'goal'),
-            args.hints,
-          ))
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, next: nextTask(board) }
+      const result = await withBoardLock(cwd, ownerId, async () => {
+        if (exec.agent?.session.header.origin === 'subagent' && args.op !== 'snapshot' && args.op !== 'next') {
+          throw new Error('only the parent session may write the blackboard')
         }
-        case 'snapshot': {
-          const board = await requireBoard(target)
-          return { ok: true, op: args.op, board }
+        switch (args.op) {
+          case 'init': {
+            const existing = await loadBoard(cwd, ownerId)
+            if (existing) throw new Error('board already exists; use snapshot or reopen')
+            const board = ensureBootstrapIntent(emptyBoard(
+              required(args.title, 'title'),
+              required(args.origin, 'origin'),
+              required(args.goal, 'goal'),
+              args.hints,
+            ))
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          case 'snapshot': {
+            const board = await requireBoard(target)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          case 'next': {
+            const board = await requireBoard(target)
+            return { ok: true, op: args.op, next: nextTask(board) }
+          }
+          case 'claim': {
+            const intentId = required(args.intentId, 'intentId')
+            const board = claimIntent(await requireBoard(target), intentId, required(args.worker, 'worker'))
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board), intent: intentOf(board, intentId) }
+          }
+          case 'conclude': {
+            const intentId = required(args.intentId, 'intentId')
+            const { board, fact } = concludeIntent(
+              await requireBoard(target),
+              intentId,
+              required(args.description, 'description'),
+              required(args.worker, 'worker'),
+              args.supersedes,
+            )
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board), fact, intent: intentOf(board, intentId) }
+          }
+          case 'reason_start': {
+            const { board, trigger } = startReason(await requireBoard(target), required(args.worker, 'worker'))
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board), trigger }
+          }
+          case 'reason_finish': {
+            const board = finishReason(await requireBoard(target), required(args.worker, 'worker'), {
+              ...args.complete !== undefined ? { complete: args.complete } : {},
+              ...args.intents !== undefined ? { intents: args.intents } : {},
+            })
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          case 'hint': {
+            const { board, hint } = addHint(
+              await requireBoard(target),
+              required(args.content, 'content'),
+              args.creator?.trim() || 'user',
+            )
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board), hint }
+          }
+          case 'close': {
+            const intentId = required(args.intentId, 'intentId')
+            const current = await requireBoard(target)
+            const board = closeIntent(current, intentId, required(args.description, 'description'))
+            interruptWorkers(ctx, exec.agent, current, intentId)
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          case 'release': {
+            const intentId = required(args.intentId, 'intentId')
+            const current = await requireBoard(target)
+            const board = releaseIntent(current, intentId)
+            interruptWorkers(ctx, exec.agent, current, intentId)
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board), intent: intentOf(board, intentId) }
+          }
+          case 'stop': {
+            const current = await requireBoard(target)
+            interruptWorkers(ctx, exec.agent, current)
+            const board = stopBoard(current)
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          case 'reopen': {
+            const board = reopenBoard(await requireBoard(target))
+            await saveBoard(cwd, ownerId, board)
+            return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
+          }
+          default: {
+            const unsupported: never = args.op
+            throw new Error(`unsupported op: ${String(unsupported)}`)
+          }
         }
-        case 'next': {
-          const board = await requireBoard(target)
-          return { ok: true, op: args.op, next: nextTask(board) }
-        }
-        case 'claim': {
-          const intentId = required(args.intentId, 'intentId')
-          const board = claimIntent(await requireBoard(target), intentId, required(args.worker, 'worker'))
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, intent: intentOf(board, intentId) }
-        }
-        case 'conclude': {
-          const intentId = required(args.intentId, 'intentId')
-          const { board, fact } = concludeIntent(
-            await requireBoard(target),
-            intentId,
-            required(args.description, 'description'),
-            required(args.worker, 'worker'),
-          )
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, fact, intent: intentOf(board, intentId) }
-        }
-        case 'reason_start': {
-          const { board, trigger } = startReason(await requireBoard(target), required(args.worker, 'worker'))
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, trigger }
-        }
-        case 'reason_finish': {
-          const board = finishReason(await requireBoard(target), required(args.worker, 'worker'), {
-            ...args.complete !== undefined ? { complete: args.complete } : {},
-            ...args.intents !== undefined ? { intents: args.intents } : {},
-          })
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, next: nextTask(board) }
-        }
-        case 'hint': {
-          const { board, hint } = addHint(
-            await requireBoard(target),
-            required(args.content, 'content'),
-            args.creator?.trim() || 'user',
-          )
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, hint }
-        }
-        case 'release': {
-          const intentId = required(args.intentId, 'intentId')
-          const board = releaseIntent(await requireBoard(target), intentId)
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board, intent: intentOf(board, intentId) }
-        }
-        case 'stop': {
-          const board = stopBoard(await requireBoard(target))
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board }
-        }
-        case 'reopen': {
-          const board = reopenBoard(await requireBoard(target))
-          await saveBoard(cwd, ownerId, board)
-          return { ok: true, op: args.op, board }
-        }
-        default: {
-          const unsupported: never = args.op
-          throw new Error(`unsupported op: ${String(unsupported)}`)
-        }
-      }
+      })
+      // Materialize optional fields exactly as they are persisted at the JSON boundary.
+      return JSON.parse(JSON.stringify(result))
     },
     presentCall: args => ({ card: 'generic', title: `blackboard ${args.op}`, kind: 'search' }),
-  }))
+  })))
 }
 
 function isHostUiInsert(ctx: Context): boolean {

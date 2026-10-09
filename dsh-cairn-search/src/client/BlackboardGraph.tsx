@@ -49,7 +49,7 @@ export function BlackboardGraph({ view, selectedId, onSelect, t }: BlackboardGra
             key={node.id}
             node={node}
             selected={selectedId === node.id}
-            kicker={t(`kind.${node.kind}`)}
+            kicker={node.supersededBy?.length ? t('kind.superseded') : t(`kind.${node.kind}`)}
             onSelect={onSelect}
           />
         ))}
@@ -78,6 +78,7 @@ function NodeCard({
     <g
       className="dsh-bb-node"
       data-kind={node.kind}
+      data-superseded={!!node.supersededBy?.length || undefined}
       data-selected={selected || undefined}
       transform={`translate(${node.x} ${node.y})`}
       onClick={() => { onSelect(node.id) }}
@@ -106,6 +107,7 @@ function StubCard({
     <g
       className="dsh-bb-node dsh-bb-stub"
       data-selected={selected || undefined}
+      data-closed={stub.closed || undefined}
       transform={`translate(${stub.x} ${stub.y})`}
       onClick={() => { onSelect(stub.id) }}
     >
@@ -134,7 +136,7 @@ export function selectedDetail(
   if (selectedId === undefined) return undefined
   const node = view.nodes.find((item) => item.id === selectedId)
   if (node !== undefined) {
-    return { kicker: node.id, body: node.description }
+    return { kicker: node.id, body: node.supersededBy?.length ? `${node.description}\n\nSuperseded by: ${node.supersededBy.join(', ')}` : node.description }
   }
   const stub = view.stubs.find((item) => item.id === selectedId)
   if (stub !== undefined) {

@@ -19,7 +19,7 @@ function nowIso(): string {
 }
 
 function openIntents(board: Board): Intent[] {
-  return board.intents.filter((intent) => intent.to === null)
+  return board.intents.filter((intent) => intent.to === null && !intent.closed)
 }
 
 function isReservedBootstrap(intent: Intent): boolean {
@@ -34,7 +34,7 @@ function isInitial(board: Board): boolean {
   if (board.facts.length !== 2) return false
   const ids = new Set(board.facts.map((fact) => fact.id))
   if (!ids.has(ORIGIN_ID) || !ids.has(GOAL_ID)) return false
-  return board.intents.every(isReservedBootstrap)
+  return board.intents.every(intent => isReservedBootstrap(intent) && !intent.closed)
 }
 
 function bootstrapInProgress(board: Board): boolean {
@@ -96,7 +96,7 @@ function reasonTask(board: Board, trigger: ReasonLease['trigger']): NextTask {
 
 function unclaimedExplorable(board: Board): Intent[] {
   return board.intents.filter(
-    (intent) => intent.to === null && intent.worker === null && !isReservedBootstrap(intent),
+    (intent) => intent.to === null && !intent.closed && intent.worker === null && !isReservedBootstrap(intent),
   )
 }
 
@@ -137,6 +137,9 @@ function assertFrom(board: Board, from: readonly string[]): string[] {
     if (id === GOAL_ID) throw new Error('goal in from')
     if (!ids.has(id)) throw new Error('unknown fact')
   }
+  if (new Set(from).size !== from.length) throw new Error('duplicate from')
+  const superseded = new Set(board.facts.flatMap(f => f.supersedes ?? []))
+  if (from.some(id => superseded.has(id))) throw new Error('superseded fact in from')
   return [...from]
 }
 
@@ -283,17 +286,22 @@ export function claimIntent(board: Board, intentId: string, worker: string): Boa
   requireActive(board)
   requireWorker(worker)
   const intent = requireIntent(board, intentId)
-  if (intent.to !== null) throw new Error('already concluded')
+  if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
   if (intent.worker !== null && intent.worker !== worker) throw new Error('already claimed')
   if (intent.worker === worker) return board
   return replaceIntent(board, intentId, { ...intent, worker })
 }
 
+function clearClaim(intent: Intent): Intent {
+  const { dispatchId, subagentId, pendingReturn, ...rest } = intent
+  return { ...rest, worker: null }
+}
+
 export function releaseIntent(board: Board, intentId: string): Board {
   requireActive(board)
   const intent = requireIntent(board, intentId)
-  if (intent.to !== null) throw new Error('already concluded')
-  return replaceIntent(board, intentId, { ...intent, worker: null })
+  if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
+  return replaceIntent(board, intentId, clearClaim(intent))
 }
 
 export function concludeIntent(
@@ -301,16 +309,21 @@ export function concludeIntent(
   intentId: string,
   description: string,
   worker: string,
+  supersedes: readonly string[] = [],
 ): { board: Board; fact: Fact } {
   requireActive(board)
   requireWorker(worker)
   const intent = requireIntent(board, intentId)
-  if (intent.to !== null) throw new Error('already concluded')
+  if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
   if (intent.worker === null) throw new Error('not claimed')
   if (intent.worker !== worker) throw new Error('not claimed')
   const trimmed = description.trim()
   if (!trimmed) throw new Error('empty description')
-  const fact: Fact = { id: nextFactId(board), description: trimmed }
+  if (supersedes.length) {
+    assertFrom(board, supersedes)
+    if (supersedes.includes(ORIGIN_ID)) throw new Error('cannot supersede origin')
+  }
+  const fact: Fact = { id: nextFactId(board), description: trimmed, ...(supersedes.length ? { supersedes: [...supersedes] } : {}) }
   const concluded: Intent = {
     ...intent,
     to: fact.id,
@@ -357,7 +370,7 @@ export function startReason(
 export function finishReason(
   board: Board,
   worker: string,
-  result: { complete?: { from: string[]; description: string }; intents?: { from: string[]; description: string }[] },
+  result: { complete?: { from: string[]; description: string }; intents?: { from: string[]; description: string; target?: string }[] },
 ): Board {
   requireWorker(worker)
   if (!board.reason || board.reason.worker !== worker) throw new Error('reason not held')
@@ -365,12 +378,13 @@ export function finishReason(
   const completing = result.complete !== undefined
   const declaring = result.intents !== undefined
   if (completing && declaring) throw new Error('complete XOR intents')
-  if (board.status !== 'active' && !completing) throw new Error('not active')
-  if (board.status === 'completed') throw new Error('not active')
+  requireActive(board)
 
   if (completing) {
     const complete = result.complete!
     const from = assertFrom(board, complete.from)
+    if (!from.some(id => id !== ORIGIN_ID)) throw new Error('completion requires observed facts')
+    if (openIntents(board).length) throw new Error('close or conclude open intents before completion')
     const description = complete.description.trim()
     if (!description) throw new Error('empty description')
     const createdAt = nowIso()
@@ -403,7 +417,14 @@ export function finishReason(
     const from = assertFrom(board, item.from)
     const description = item.description.trim()
     if (!description) throw new Error('empty description')
+    const target = item.target?.trim()
+    if (item.target !== undefined && !target) throw new Error('empty target')
+    const peers = [...openIntents(board), ...declared]
+    if (peers.some(i => i.description.trim() === description || (target && i.target === target))) {
+      throw new Error('overlapping open intent; conclude or close it first')
+    }
     declared.push({
+      ...(target ? { target } : {}),
       id: nextIntentId({ ...board, intents: [...board.intents, ...declared] }),
       from,
       to: null,
@@ -441,17 +462,19 @@ export function addHint(board: Board, content: string, creator: string): { board
 }
 
 export function stopBoard(board: Board): Board {
+  if (board.status === 'completed') return board
   return {
     ...board,
     status: 'stopped',
     reason: null,
     intents: board.intents.map((intent) =>
-      intent.to === null ? { ...intent, worker: null } : intent,
+      intent.to === null ? clearClaim(intent) : intent,
     ),
   }
 }
 
 export function reopenBoard(board: Board): Board {
+  if (board.status === 'completed') throw new Error('completed board cannot be reopened')
   return { ...board, status: 'active' }
 }
 
@@ -470,4 +493,43 @@ export function ensureBootstrapIntent(board: Board): Board {
     concludedAt: null,
   }
   return { ...board, intents: [...board.intents, intent] }
+}
+
+/** Close abandoned/replaced work without inventing a fact. */
+export function closeIntent(board: Board, intentId: string, reason: string): Board {
+  requireActive(board)
+  const intent = requireIntent(board, intentId)
+  if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
+  if (!reason.trim()) throw new Error('empty close reason')
+  const closed = replaceIntent(board, intentId, { ...clearClaim(intent), closed: { reason: reason.trim(), at: nowIso() } })
+  return addHint(closed, `${intentId} closed: ${reason.trim()}`, 'dispatcher.close').board
+}
+
+/** Serialize read-modify-write, including different plugin instances sharing an owner. */
+const transactions = new Map<string, Promise<unknown>>()
+export async function withBoardLock<T>(cwd: string, ownerId: string, run: () => Promise<T>): Promise<T> {
+  const key = boardPath(cwd, ownerId)
+  const prior = transactions.get(key) ?? Promise.resolve()
+  const current = prior.catch(() => undefined).then(run)
+  transactions.set(key, current)
+  try { return await current } finally {
+    if (transactions.get(key) === current) transactions.delete(key)
+  }
+}
+
+/** Reserve one claimed intent for one spawn call; a repeated spawn cannot reuse it. */
+export function reserveDispatch(board: Board, intentId: string, dispatchId: string): Board {
+  requireActive(board)
+  const intent = requireIntent(board, intentId)
+  if (intent.to !== null || intent.closed || !intent.worker) throw new Error('claim intent before spawn')
+  if (intent.dispatchId) throw new Error('intent already dispatched')
+  if (openIntents(board).some(i => i.pendingReturn)) throw new Error('conclude, release or close returned workers before spawn')
+  if (nextTask(board).kind === 'reason' || board.reason) throw new Error('finish pending reason before spawn')
+  return replaceIntent(board, intentId, { ...intent, dispatchId })
+}
+
+export function bindDispatch(board: Board, intentId: string, dispatchId: string, subagentId: string): Board {
+  const intent = requireIntent(board, intentId)
+  if (intent.dispatchId !== dispatchId || intent.closed || intent.to !== null || board.status !== 'active') return board
+  return replaceIntent(board, intentId, { ...intent, subagentId })
 }

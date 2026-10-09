@@ -115,7 +115,8 @@ function parseBoard(text) {
   const facts = [];
   for (const item of value.facts) {
     if (!isRecord(item) || typeof item.id !== "string" || typeof item.description !== "string") return null;
-    facts.push({ id: item.id, description: item.description });
+    if (item.supersedes !== void 0 && (!Array.isArray(item.supersedes) || item.supersedes.some((id) => typeof id !== "string"))) return null;
+    facts.push({ id: item.id, description: item.description, ...Array.isArray(item.supersedes) ? { supersedes: item.supersedes } : {} });
   }
   const intents = [];
   for (const item of value.intents) {
@@ -130,7 +131,8 @@ function parseBoard(text) {
       id: item.id,
       content: item.content,
       creator: item.creator,
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      ...typeof item.messageId === "string" ? { messageId: item.messageId } : {}
     });
   }
   const reason = parseReason(value.reason);
@@ -191,6 +193,7 @@ function layoutBoard(board) {
         id,
         kind: id === ORIGIN_ID ? "origin" : id === GOAL_ID ? "goal" : "fact",
         description: fact.description,
+        supersededBy: board.facts.filter((f) => f.supersedes?.includes(id)).map((f) => f.id),
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
@@ -205,7 +208,8 @@ function layoutBoard(board) {
     id: intent.id,
     from: intent.from,
     to: intent.to,
-    description: intent.description,
+    description: intent.closed ? `${intent.description}
+Closed: ${intent.closed.reason}` : intent.description,
     status: edgeStatus(intent),
     worker: intent.worker,
     creator: intent.creator
@@ -227,6 +231,7 @@ function layoutBoard(board) {
       const stub = {
         id: `open:${edge.id}`,
         intentId: edge.id,
+        closed: edge.status === "closed",
         description: edge.description,
         worker: edge.worker,
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
@@ -238,8 +243,8 @@ function layoutBoard(board) {
       maxBottom = Math.max(maxBottom, stub.y + stub.height);
     });
   }
-  const openCount = board.intents.filter((intent) => intent.to === null).length;
-  const claimedCount = board.intents.filter((intent) => intent.to === null && intent.worker !== null).length;
+  const openCount = board.intents.filter((intent) => intent.to === null && !intent.closed).length;
+  const claimedCount = board.intents.filter((intent) => intent.to === null && !intent.closed && intent.worker !== null).length;
   return {
     title: board.title,
     status: board.status,
@@ -276,6 +281,7 @@ function edgePath(from, to) {
   return `M ${start.x} ${start.y} C ${mid} ${start.y}, ${mid} ${end.y}, ${end.x} ${end.y}`;
 }
 function edgeStatus(intent) {
+  if (intent.closed) return "closed";
   if (intent.to === GOAL_ID) return "complete";
   if (intent.to !== null) return "concluded";
   if (intent.worker !== null) return "claimed";
@@ -289,7 +295,13 @@ function parseIntent(item) {
   if (item.to !== null && typeof item.to !== "string") return null;
   if (item.worker !== null && typeof item.worker !== "string") return null;
   if (item.concludedAt !== null && typeof item.concludedAt !== "string") return null;
+  if (item.closed !== void 0 && (!isRecord(item.closed) || typeof item.closed.reason !== "string" || typeof item.closed.at !== "string")) return null;
   return {
+    ...isRecord(item.closed) ? { closed: { reason: item.closed.reason, at: item.closed.at } } : {},
+    ...typeof item.target === "string" ? { target: item.target } : {},
+    ...typeof item.dispatchId === "string" ? { dispatchId: item.dispatchId } : {},
+    ...typeof item.subagentId === "string" ? { subagentId: item.subagentId } : {},
+    ...item.pendingReturn === true ? { pendingReturn: true } : {},
     id: item.id,
     from: item.from,
     to: item.to,
@@ -353,7 +365,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
           {
             node,
             selected: selectedId === node.id,
-            kicker: t(`kind.${node.kind}`),
+            kicker: node.supersededBy?.length ? t("kind.superseded") : t(`kind.${node.kind}`),
             onSelect
           },
           node.id
@@ -382,6 +394,7 @@ function NodeCard({
     {
       className: "dsh-bb-node",
       "data-kind": node.kind,
+      "data-superseded": !!node.supersededBy?.length || void 0,
       "data-selected": selected || void 0,
       transform: `translate(${node.x} ${node.y})`,
       onClick: () => {
@@ -414,6 +427,7 @@ function StubCard({
     {
       className: "dsh-bb-node dsh-bb-stub",
       "data-selected": selected || void 0,
+      "data-closed": stub.closed || void 0,
       transform: `translate(${stub.x} ${stub.y})`,
       onClick: () => {
         onSelect(stub.id);
@@ -439,7 +453,9 @@ function selectedDetail(view, selectedId) {
   if (selectedId === void 0) return void 0;
   const node = view.nodes.find((item) => item.id === selectedId);
   if (node !== void 0) {
-    return { kicker: node.id, body: node.description };
+    return { kicker: node.id, body: node.supersededBy?.length ? `${node.description}
+
+Superseded by: ${node.supersededBy.join(", ")}` : node.description };
   }
   const stub = view.stubs.find((item) => item.id === selectedId);
   if (stub !== void 0) {
@@ -664,6 +680,7 @@ var zh = {
   "legend.goal": "\u76EE\u6807",
   "legend.fact": "\u4E8B\u5B9E",
   "legend.open": "\u63A2\u7D22\u4E2D",
+  "kind.superseded": "\u5DF2\u66FF\u4EE3",
   "legend.claimed": "\u5DF2\u8BA4\u9886",
   "detail.intent": "\u610F\u56FE {id}",
   "detail.fact": "\u4E8B\u5B9E {id}",
@@ -694,6 +711,7 @@ var en = {
   "legend.goal": "Goal",
   "legend.fact": "Fact",
   "legend.open": "Exploring",
+  "kind.superseded": "Superseded",
   "legend.claimed": "Claimed",
   "detail.intent": "Intent {id}",
   "detail.fact": "Fact {id}",
@@ -932,6 +950,10 @@ var CSS = `
   stroke: var(--dsw-alias-label-tertiary);
   stroke-width: 1.25;
 }
+.dsh-bb-stub[data-closed="true"] .dsh-bb-node-id { text-decoration: line-through; }
+.dsh-bb-stub[data-closed="true"] { opacity: .5; }
+.dsh-bb-node[data-superseded="true"] { opacity: .5; }
+.dsh-bb-edge[data-status="closed"] { stroke: #94a3b8; stroke-dasharray: 3 5; }
 .dsh-bb-edge[data-status="claimed"] {
   stroke: var(--dsw-alias-state-warn-primary);
   stroke-dasharray: 5 3;

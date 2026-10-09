@@ -197,6 +197,10 @@ const CSS = `
   stroke: var(--dsw-alias-label-tertiary);
   stroke-width: 1.25;
 }
+.dsh-bb-stub[data-closed="true"] .dsh-bb-node-id { text-decoration: line-through; }
+.dsh-bb-stub[data-closed="true"] { opacity: .5; }
+.dsh-bb-node[data-superseded="true"] { opacity: .5; }
+.dsh-bb-edge[data-status="closed"] { stroke: #94a3b8; stroke-dasharray: 3 5; }
 .dsh-bb-edge[data-status="claimed"] {
   stroke: var(--dsw-alias-state-warn-primary);
   stroke-dasharray: 5 3;
