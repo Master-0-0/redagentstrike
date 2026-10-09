@@ -2,7 +2,7 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Kind = Literal['ip', 'domain', 'host', 'api', 'account', 'password', 'token', 'secret', 'connection_string', 'person', 'phone', 'email', 'wechat', 'qq']
+Kind = Literal['ip', 'domain', 'host', 'api', 'account', 'password', 'token', 'secret', 'connection_string', 'person', 'phone', 'email', 'wechat', 'qq', 'employee_id', 'student_id', 'national_id', 'user_id']
 Category = Literal['assets', 'credentials', 'identities']
 Status = Literal['unverified', 'observed', 'verified', 'failed', 'revoked', 'disabled']
 SECRET_KINDS = {'password', 'token', 'secret', 'connection_string'}
@@ -38,8 +38,8 @@ class Entity(Model):
             raise ValueError('empty identifier')
         if (self.kind in SECRET_KINDS) != (self.secret is not None):
             raise ValueError('secret required only for sensitive kinds')
-        if self.kind in {'account', 'person'} and not self.namespace.strip():
-            raise ValueError('account/person requires namespace')
+        if self.kind in {'account', 'person', 'employee_id', 'student_id', 'user_id'} and not self.namespace.strip():
+            raise ValueError('account/person/employee_id/student_id/user_id requires namespace')
         if self.status in {'verified', 'failed', 'revoked'} and not self.evidence.strip():
             raise ValueError('verification requires evidence')
         return self

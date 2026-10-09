@@ -70,7 +70,20 @@ try {
   const revealed = await call('query_intel_lib', { ids: [eid], include_secrets: true }, parent)
   assert.ok(JSON.stringify(revealed).includes('FIXTURE-NOT-REAL'))
   assert.equal(await readFile(join(cwd, '.dsh/blackboards/parent.json'), 'utf8'), board)
-  const verification = { preset_scoped: true, inherited_by_child: true, skill_loaded: true, child_save_parent_query: true, explicit_secret_read: true, board_unchanged: true }
+  const identityKinds = ['person', 'phone', 'email', 'wechat', 'qq', 'employee_id', 'student_id', 'national_id', 'user_id']
+  const identitySaved = await call('save_intel', {
+    submission_key: 'harness-identities',
+    entities: identityKinds.map(kind => ({ ref: kind, kind, name: `Fixture ${kind}`, identifier: `fixture-${kind}`, namespace: 'fixture.example', status: 'observed', evidence: 'Local fixture profile; not real identity data' })),
+    relations: [{ from_ref: 'person', to_ref: 'phone', label: 'profile phone', basis: 'observed', evidence: 'Local fixture explicitly associates these fields' }],
+  })
+  assert.ok(JSON.stringify(identitySaved).includes('"ok":true'), JSON.stringify(identitySaved))
+  const identityQuery = await call('query_intel_lib', { category: 'identities' }, parent)
+  assert.ok(JSON.stringify(identityQuery).includes('fixture-phone'))
+  const identityRows = await fetch(apiUrl + `/intel/workspaces/${wid}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ category: 'identities' }) }).then(r => r.json())
+  assert.equal(identityRows.total, identityKinds.length)
+  assert.deepEqual(identityRows.items.map(e => e.kind).sort(), identityKinds.sort())
+  assert.ok(identityRows.items.every(e => e.latest_observation.session_id === child.session.id))
+  const verification = { identity_child_save_parent_and_ui_query: true, preset_scoped: true, inherited_by_child: true, skill_loaded: true, child_save_parent_query: true, explicit_secret_read: true, board_unchanged: true }
   await writeFile(join(cwd, 'verification.json'), JSON.stringify(verification, null, 2))
   console.log(JSON.stringify(verification))
 } finally { if (run) await run.dispose(); await ctx.fiber.dispose() }

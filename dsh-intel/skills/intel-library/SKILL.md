@@ -17,13 +17,37 @@ Use `query_intel_lib` before redundant discovery, and `save_intel` as discoverie
 
 - assets: ip, domain, host, api
 - credentials: account, password, token, secret, connection_string
-- identities: person, phone, email, wechat, qq
+- identities: person, phone, email, wechat, qq, employee_id, student_id, national_id, user_id
 
-Each entity: `{ref, kind, name, identifier, namespace?, secret?, status?, note?, evidence?, observed_at?}`. `ref` is a short local ID. `identifier` identifies the object without a secret; for a password use account + service, for a token use its service/name. Sensitive kinds require `secret`; other kinds must omit it. Never put raw sensitive values in name/identifier/namespace. Account/person require namespace (service or identity domain); a shared name does not prove shared identity. Email/phone associations require actual evidence. Prefer a namespace for every ambiguous identity.
+Each entity: `{ref, kind, name, identifier, namespace?, secret?, status?, note?, evidence?, observed_at?}`. `ref` is a short local ID. `identifier` identifies the object without a secret; for a password use account + service, for a token use its service/name. Sensitive kinds require `secret`; other kinds must omit it. Never put raw sensitive values in name/identifier/namespace. Account/person/employee_id/student_id/user_id require namespace (service or identity domain); a shared name does not prove shared identity. Email/phone associations require actual evidence. Prefer a namespace for every ambiguous identity.
 
 Status: unverified (default), observed, verified, failed, revoked, disabled. verified/failed/revoked require actual evidence, including the target and time when known. A configuration string alone is unverified. A changed credential value is a separate entity; history is retained. Existing manual status decisions are not overwritten by agent saves.
 
 Each relation: `{from_ref, to_ref, label, basis, evidence}`. Endpoints use local refs or previously returned IDs. `basis`: observed / declared / inferred. Preserve uncertainty. Relation-only saves are allowed. Save receipts map refs to stable IDs; reuse IDs for queries and links. Same submission key with changed content is rejected. Repeated observations of the same normalized object merge while retaining source history.
+
+## Capture identities when they are observed
+
+For task-relevant source content, explicitly check for names, phone numbers, email addresses, WeChat IDs, QQ IDs, employee IDs (工号), student IDs (学号), national ID numbers (身份证号) and user IDs (用户 ID). Save each actual observed value independently as `person`, `phone`, `email`, `wechat`, `qq`, `employee_id`, `student_id`, `national_id` or `user_id`. Putting it only in a response, a fact, an account or a note does not create an identity record. Keep login accounts as `account`; if the source explicitly uses an email/phone as the login identifier, also save that value as an `email`/`phone` entity. Do not classify arbitrary numeric account IDs as phone or QQ numbers without source evidence.
+
+Use the source service/domain as `namespace` (mandatory for `person`, `employee_id`, `student_id` and `user_id`); do not invent a personal affiliation. Record where the value was observed in `evidence`, including an existing file/response reference and timestamp when available. Preserve masked values exactly and never fill missing digits. Do not copy field labels, placeholders or documentation examples as discovered people. Source observation supports `observed`, not a claim that the identity or ownership has been verified.
+
+Keep identifiers as strings: preserve leading zeros, letter case and masked characters. Classify by explicit source field meaning, not by length or numeric appearance. Use the source employer/school/system domain for employee/student/user IDs so identical values from different systems remain separate. A user ID is an identity identifier; retain a separate account entity when login-account information is also observed. A national ID number is an identity entity with its observed value in `identifier`, not a credential in `secret`.
+
+For example, if an actual profile response in the current task explicitly connects a name and email, submit this shape using the real observed values (the following values are fixtures, never save them as discoveries):
+
+```json
+{
+  "entities": [
+    {"ref": "person", "kind": "person", "name": "Example Person", "identifier": "Example Person", "namespace": "service.example", "status": "observed", "evidence": "Profile response reference and observation time"},
+    {"ref": "email", "kind": "email", "name": "Profile email", "identifier": "person@example.invalid", "namespace": "service.example", "status": "observed", "evidence": "Same profile response reference and observation time"}
+  ],
+  "relations": [
+    {"from_ref": "person", "to_ref": "email", "label": "profile email", "basis": "observed", "evidence": "The same profile explicitly binds this person and email"}
+  ]
+}
+```
+
+Save standalone identity values even if no person or relationship is known. Only create relationships supported by evidence, and preserve uncertainty. A successful receipt must map each submitted ref to an ID before reporting it as saved. For `invalid_intel_payload`, correct missing namespace, unsupported kind or other invalid fields and submit under a new key; retrying the same stored invalid payload cannot fix it. Report an unresolved save failure without claiming the library is up to date.
 
 ## Failure and context discipline
 
