@@ -18,7 +18,7 @@ from workbench.api import create_app
 from workbench.config import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'docs/verification/intel'
+OUT = Path(os.environ.get('INTEL_SMOKE_OUT', ROOT / 'docs/verification/intel'))
 OUT.mkdir(parents=True, exist_ok=True)
 
 def free_port():
@@ -144,9 +144,34 @@ with tempfile.TemporaryDirectory(prefix='intel-acceptance-') as tmp:
                 page.set_viewport_size({'width': 390, 'height': 844})
                 page.screenshot(path=str(OUT/'mobile.png'), full_page=True)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.get_by_role('button', name='删除工作区', exact=True).click()
+                dialog = page.get_by_role('dialog', name='删除情报工作区')
+                expect(dialog).to_contain_text('授权演示项目')
+                dialog.get_by_role('button', name='取消', exact=True).click()
+                expect(dialog).to_have_count(0)
+                page.get_by_role('button', name='删除工作区', exact=True).click()
+                page.route('**/api/intel/workspaces/*', lambda route: route.fulfill(status=503, content_type='application/json', body='{"error_code":"intel_storage_unavailable"}') if route.request.method == 'DELETE' else route.continue_())
+                dialog.get_by_role('button', name='确认删除', exact=True).click()
+                expect(dialog.get_by_role('alert')).to_contain_text('情报存储不可用')
+                page.unroute('**/api/intel/workspaces/*')
+                dialog.get_by_role('button', name='确认删除', exact=True).click()
+                expect(dialog).to_have_count(0)
+                expect(page.locator('.intel-workspace-list button').filter(has_text='授权演示项目')).to_have_count(0)
+                page.reload()
+                page.get_by_role('button', name='情报资产库', exact=True).click()
+                expect(page.locator('.intel-workspace-list button').filter(has_text='隔离工作区')).to_be_visible()
+                expect(page.locator('.intel-workspace-list button').filter(has_text='授权演示项目')).to_have_count(0)
+                # Deleting the final workspace clears persisted selection and shows the empty state.
+                while page.locator('.intel-workspace-list button').count():
+                    page.locator('.intel-workspace-list button').first.click()
+                    page.get_by_role('button', name='删除工作区', exact=True).click()
+                    page.get_by_role('dialog').get_by_role('button', name='确认删除', exact=True).click()
+                    expect(page.get_by_role('dialog')).to_have_count(0)
+                expect(page.get_by_role('heading', name='选择或创建一个工作区')).to_be_visible()
+                assert page.evaluate("localStorage.getItem('intel-workspace')") is None
                 assert not errors, errors
                 browser.close()
-        result = dict(harness=harness, ui=dict(workspace_isolation=True, navigation=True, linked_navigation=True, explicit_secret_reveal=True, manual_edit=True, manual_create=True, relationship_create=True, live_update_preserves_selection=True, outage_preserves_rows=True, empty_search=True, audit_without_secrets=True, mobile_no_overflow=True, page_errors=errors))
+        result = dict(harness=harness, ui=dict(workspace_isolation=True, navigation=True, linked_navigation=True, explicit_secret_reveal=True, manual_edit=True, manual_create=True, relationship_create=True, live_update_preserves_selection=True, outage_preserves_rows=True, empty_search=True, audit_without_secrets=True, mobile_no_overflow=True, workspace_delete=True, page_errors=errors))
         (OUT/'verification.json').write_text(json.dumps(result, ensure_ascii=False, indent=2))
         print(json.dumps(result, ensure_ascii=False))
     finally:

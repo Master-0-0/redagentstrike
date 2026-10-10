@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from workbench.intel import IntelStore, IntelError
+from workbench.intel_models import Query
 
 
 def context(tmp_path, name='project'):
@@ -179,3 +180,56 @@ def test_scoped_identity_ids_preserve_zeros_and_do_not_merge_across_systems(clie
     result = client.post('/intel/agent/query', json=dict(context=ctx, category='identities', kind=kind)).json()
     assert result['total'] == 2
     assert all(row['identifier'] == '000123' for row in result['items'])
+
+
+def test_delete_workspace_cleans_data_and_prevents_automatic_recreation(client, tmp_path, settings, monkeypatch):
+    body = discovery(context(tmp_path))
+    receipt = save(client, body)
+    wid = receipt['workspace_id']
+    other = save(client, discovery(context(tmp_path, 'retained')))
+    project = Path(body['context']['workspace_path'])
+    marker = project / 'keep.txt'
+    marker.write_text('keep')
+    monkeypatch.setattr('workbench.intel_api.list_blackboards', lambda _: {
+        'workspaces': [dict(path=str(project), title='Auto imported')]
+    })
+    assert client.delete(f'/intel/workspaces/{wid}').json() == {'ok': True}
+    assert marker.read_text() == 'keep'
+    assert client.delete(f'/intel/workspaces/{wid}').status_code == 404
+    assert client.post(f'/intel/workspaces/{wid}/query', json={}).status_code == 404
+    assert [w['id'] for w in client.get('/intel/workspaces').json()['items']] == [other['workspace_id']]
+    assert client.post('/intel/agent/save', json=body).status_code == 409
+    assert client.post('/intel/agent/query', json={'context': body['context']}).status_code == 409
+    restarted = IntelStore(settings.data_dir)
+    try:
+        for table in ('entities', 'relations', 'observations', 'audit', 'submissions'):
+            assert restarted.db.execute(f'SELECT count(*) FROM {table} WHERE workspace_id=?', (wid,)).fetchone()[0] == 0
+        with pytest.raises(IntelError, match='workspace_deleted'):
+            restarted.workspace(str(project))
+        assert restarted.query(other['workspace_id'], Query())['total'] == 3
+    finally:
+        restarted.close()
+    recreated = client.post('/intel/workspaces', json=dict(path=str(project), title='Recreated')).json()
+    assert recreated['id'] != wid
+    assert client.post(f"/intel/workspaces/{recreated['id']}/query", json={}).json()['total'] == 0
+    assert save(client, body)['workspace_id'] == recreated['id']
+
+
+def test_delete_workspace_with_legacy_relation_retractions(client, tmp_path, settings):
+    first = save(client, discovery(context(tmp_path)))
+    other = save(client, discovery(context(tmp_path, 'retained')))
+    store = IntelStore(settings.data_dir)
+    try:
+        with store.db:
+            store.db.execute('CREATE TABLE relation_retractions(relation_id TEXT PRIMARY KEY REFERENCES relations(id),evidence BLOB NOT NULL,session_id TEXT NOT NULL,created_at TEXT NOT NULL)')
+            for receipt in (first, other):
+                store.db.execute('INSERT INTO relation_retractions VALUES(?,?,?,?)',
+                                 (receipt['relation_ids'][0], store.encrypt('retracted'), 'test', '2026-10-10'))
+        response = client.delete(f"/intel/workspaces/{first['workspace_id']}")
+        assert response.status_code == 200, response.text
+        rows = store.db.execute('SELECT relation_id FROM relation_retractions').fetchall()
+        assert [row[0] for row in rows] == [other['relation_ids'][0]]
+        assert store.db.execute('PRAGMA foreign_key_check').fetchall() == []
+        assert store.query(other['workspace_id'], Query())['total'] == 3
+    finally:
+        store.close()
