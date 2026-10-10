@@ -136,3 +136,46 @@ def test_verification_requires_evidence_and_invalid_ip_atomic(client, tmp_path):
     body['entities'][1] = dict(ref='user', kind='ip', name='bad', identifier='not-an-ip')
     assert client.post('/intel/agent/save', json=body).json()['error_code'] == 'invalid_ip'
     assert client.post('/intel/agent/query', json=dict(context=body['context'])).json()['total'] == 0
+
+
+def test_identity_discoveries_are_visible_to_ui_and_parent_after_restart(client, tmp_path, settings):
+    ctx = context(tmp_path)
+    kinds = ['person', 'phone', 'email', 'wechat', 'qq', 'employee_id', 'student_id', 'national_id', 'user_id']
+    entities = [dict(ref=k, kind=k, name='Fixture ' + k, identifier='fixture-' + k,
+                     namespace='fixture.example', status='observed', evidence='Local profile fixture') for k in kinds]
+    receipt = save(client, dict(context=ctx, submission_key='identities', entities=entities,
+        relations=[dict(from_ref='person', to_ref='phone', label='profile phone', basis='observed', evidence='Explicit association in fixture')]))
+    wid = receipt['workspace_id']
+    ids = {e['ref']: e['id'] for e in receipt['entities']}
+    ui = client.post(f'/intel/workspaces/{wid}/query', json=dict(category='identities')).json()
+    assert ui['total'] == len(kinds)
+    assert {e['kind'] for e in ui['items']} == set(kinds)
+    parent = dict(ctx, session_id='main-1')
+    result = client.post('/intel/agent/query', json=dict(context=parent, category='identities')).json()
+    assert {e['id'] for e in result['items']} == set(ids.values())
+    detail = client.get(f"/intel/workspaces/{wid}/entities/{ids['person']}").json()
+    assert detail['relations'][0]['target']['id'] == ids['phone']
+    assert detail['observations'][0]['session_id'] == ctx['session_id']
+    restarted = IntelStore(settings.data_dir)
+    try:
+        from workbench.intel_models import Query
+        assert restarted.query(wid, Query(category='identities'))['total'] == len(kinds)
+    finally:
+        restarted.close()
+
+
+@pytest.mark.parametrize('kind', ['employee_id', 'student_id', 'user_id'])
+def test_scoped_identity_ids_preserve_zeros_and_do_not_merge_across_systems(client, tmp_path, kind):
+    ctx = context(tmp_path)
+    entity = dict(ref='id', kind=kind, name='Fixture ID', identifier='000123')
+    body = dict(context=ctx, submission_key='missing-scope', entities=[entity])
+    assert client.post('/intel/agent/save', json=body).status_code == 422
+    ids = []
+    for scope in ['one.example', 'two.example']:
+        receipt = save(client, dict(context=ctx, submission_key=scope.replace('.', '-'),
+                                   entities=[dict(entity, namespace=scope)]))
+        ids.append(receipt['entities'][0]['id'])
+    assert ids[0] != ids[1]
+    result = client.post('/intel/agent/query', json=dict(context=ctx, category='identities', kind=kind)).json()
+    assert result['total'] == 2
+    assert all(row['identifier'] == '000123' for row in result['items'])

@@ -1115,7 +1115,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 
 .blackboard-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -1131,7 +1131,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 }
 
 .blackboard-list { padding: 12px; }
-.blackboard-stage { padding: 12px 14px 16px; }
+.blackboard-stage { padding: 20px; }
 
 .blackboard-workspace { margin-bottom: 16px; }
 .blackboard-workspace header h2 {
@@ -1205,13 +1205,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
   line-height: 1.5;
 }
 
-.page-blackboard .dsh-bb-header { padding: 4px 4px 10px; }
-.page-blackboard .dsh-bb-canvas {
-  min-height: 240px;
-  border-radius: 10px;
-  background: #f7f9fd;
-  padding: 8px;
-}
+.page-blackboard .dsh-bb-header { padding: 0 4px 20px; gap: 8px; }
+.page-blackboard .dsh-bb-title { font-size: 18px; font-weight: 650; line-height: 26px; }
+.page-blackboard .dsh-bb-status { padding: 4px 10px; border-radius: 20px; background: #f0f4fa; color: #536580; }
+.page-blackboard .dsh-bb-owner { overflow-wrap: anywhere; }
+.page-blackboard .dsh-bb-meta { gap: 16px; font-size: 12px; }
+.page-blackboard .dsh-bb-body { padding: 0; }
+.page-blackboard .dsh-bb-canvas { min-height: 360px; background-color: #f8fafc; }
+.page-blackboard .dsh-bb-legend { margin: 14px 4px; gap: 18px; }
+.page-blackboard .dsh-bb-detail { margin: 16px 0 0; padding: 18px 20px; background: #f8fafc; border: 1px solid #e4e9f1; }
+.page-blackboard .dsh-bb-detail-body { font-size: 13px; line-height: 1.8; }
+.page-blackboard .dsh-bb-detail-kicker { margin-bottom: 8px; color: #002fa7; }
 
 @media (max-width: 900px) {
   .blackboard-layout { grid-template-columns: 1fr; }

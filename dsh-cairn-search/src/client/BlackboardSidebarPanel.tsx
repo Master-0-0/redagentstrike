@@ -196,7 +196,7 @@ function panelBody({
         <span><span className="dsh-bb-swatch origin" />{t('legend.origin')}</span>
         <span><span className="dsh-bb-swatch" />{t('legend.fact')}</span>
         <span><span className="dsh-bb-swatch goal" />{t('legend.goal')}</span>
-        <span><span className="dsh-bb-swatch open" />{t('legend.claimed')}</span>
+        <span><span className="dsh-bb-swatch intent" />{t('kind.intent')}</span>
       </div>
       {detail !== undefined && (
         <div className="dsh-bb-detail">

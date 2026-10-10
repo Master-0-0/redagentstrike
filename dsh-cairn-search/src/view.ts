@@ -6,17 +6,18 @@
 import type { Board, Fact, Hint, Intent, ProjectStatus, ReasonLease } from './types.ts'
 import { GOAL_ID, ORIGIN_ID } from './types.ts'
 
-const NODE_WIDTH = 168
-const NODE_HEIGHT = 56
-const OPEN_WIDTH = 168
-const OPEN_HEIGHT = 44
-const COLUMN_GAP = 64
-const ROW_GAP = 20
-const PAD = 28
+const NODE_WIDTH = 240
+const NODE_HEIGHT = 144
+const INTENT_WIDTH = 240
+const INTENT_HEIGHT = 144
+const COLUMN_GAP = 88
+const ROW_GAP = 32
+const PAD = 40
 
 /** One fact or origin/goal node on the canvas. */
 export interface GraphNode {
   readonly id: string
+  readonly supersededBy?: readonly string[]
   readonly kind: 'origin' | 'goal' | 'fact'
   readonly description: string
   readonly x: number
@@ -25,19 +26,20 @@ export interface GraphNode {
   readonly height: number
 }
 
-/** One intent drawn as a path; `to` is null while the intent is still open. */
+/** One intent relationship; `to` is null while the intent is still open. */
 export interface GraphEdge {
   readonly id: string
   readonly from: readonly string[]
   readonly to: string | null
   readonly description: string
-  readonly status: 'open' | 'claimed' | 'concluded' | 'complete'
+  readonly status: 'open' | 'claimed' | 'concluded' | 'complete' | 'closed'
   readonly worker: string | null
   readonly creator: string
 }
 
-/** Open-intent stub sitting to the right of its sources until `to` is written. */
-export interface GraphStub {
+/** An intent card retained through every lifecycle state, including completion. */
+export interface GraphIntent {
+  readonly status: GraphEdge['status']
   readonly id: string
   readonly intentId: string
   readonly description: string
@@ -55,7 +57,7 @@ export interface BoardView {
   readonly bootstrapEnabled: boolean
   readonly nodes: readonly GraphNode[]
   readonly edges: readonly GraphEdge[]
-  readonly stubs: readonly GraphStub[]
+  readonly intents: readonly GraphIntent[]
   readonly hints: readonly Hint[]
   readonly reason: ReasonLease | null
   readonly factCount: number
@@ -89,7 +91,8 @@ export function parseBoard(text: string): Board | null {
   const facts: Fact[] = []
   for (const item of value.facts) {
     if (!isRecord(item) || typeof item.id !== 'string' || typeof item.description !== 'string') return null
-    facts.push({ id: item.id, description: item.description })
+    if (item.supersedes !== undefined && (!Array.isArray(item.supersedes) || item.supersedes.some(id => typeof id !== 'string'))) return null
+    facts.push({ id: item.id, description: item.description, ...(Array.isArray(item.supersedes) ? { supersedes: item.supersedes as string[] } : {}) })
   }
   const intents: Intent[] = []
   for (const item of value.intents) {
@@ -111,6 +114,7 @@ export function parseBoard(text: string): Board | null {
       content: item.content,
       creator: item.creator,
       createdAt: item.createdAt,
+      ...(typeof item.messageId === 'string' ? { messageId: item.messageId } : {}),
     })
   }
   const reason = parseReason(value.reason)
@@ -148,16 +152,16 @@ export function layoutBoard(board: Board): BoardView {
     visiting.add(id)
     const incoming = board.intents.filter((intent) => intent.to === id)
     const col = incoming.length === 0
-      ? 1
-      : 1 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
+      ? 2
+      : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
     visiting.delete(id)
     columns.set(id, col)
     return col
   }
   for (const fact of board.facts) columnOf(fact.id)
-  const factColumns = board.facts.map((fact) => columns.get(fact.id) ?? 1)
+  const factColumns = board.facts.filter((fact) => fact.id !== GOAL_ID).map((fact) => columns.get(fact.id) ?? 1)
   const maxFactCol = factColumns.length === 0 ? 0 : Math.max(...factColumns)
-  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 1, maxFactCol + 1))
+  columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 2, maxFactCol + 2))
 
   const byColumn = new Map<number, string[]>()
   for (const fact of board.facts) {
@@ -169,7 +173,6 @@ export function layoutBoard(board: Board): BoardView {
 
   const factById = new Map(board.facts.map((fact) => [fact.id, fact]))
   const nodes: GraphNode[] = []
-  const nodeAt = new Map<string, GraphNode>()
   let maxCol = 0
   let maxBottom = 0
   for (const [col, ids] of [...byColumn.entries()].sort((a, b) => a[0] - b[0])) {
@@ -181,13 +184,13 @@ export function layoutBoard(board: Board): BoardView {
         id,
         kind: id === ORIGIN_ID ? 'origin' : id === GOAL_ID ? 'goal' : 'fact',
         description: fact.description,
+        supersededBy: board.facts.filter(f => f.supersedes?.includes(id)).map(f => f.id),
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
       }
       nodes.push(node)
-      nodeAt.set(id, node)
       maxBottom = Math.max(maxBottom, node.y + node.height)
     })
   }
@@ -196,50 +199,60 @@ export function layoutBoard(board: Board): BoardView {
     id: intent.id,
     from: intent.from,
     to: intent.to,
-    description: intent.description,
+    description: intent.closed ? `${intent.description}\nClosed: ${intent.closed.reason}` : intent.description,
     status: edgeStatus(intent),
     worker: intent.worker,
     creator: intent.creator,
   }))
 
-  const stubs: GraphStub[] = []
-  const openByColumn = new Map<number, GraphEdge[]>()
+  const intents: GraphIntent[] = []
+  const intentByColumn = new Map<number, GraphEdge[]>()
   for (const edge of edges) {
-    if (edge.to !== null) continue
     const fromCols = edge.from.map((id) => columns.get(id) ?? 0)
     const col = (fromCols.length === 0 ? 0 : Math.max(...fromCols)) + 1
-    const list = openByColumn.get(col) ?? []
+    const list = intentByColumn.get(col) ?? []
     list.push(edge)
-    openByColumn.set(col, list)
+    intentByColumn.set(col, list)
   }
-  for (const [col, list] of openByColumn) {
+  for (const [col, list] of intentByColumn) {
     maxCol = Math.max(maxCol, col)
     const occupied = (byColumn.get(col) ?? []).length
     list.forEach((edge, index) => {
-      const stub: GraphStub = {
-        id: `open:${edge.id}`,
+      const stub: GraphIntent = {
+        id: `intent:${edge.id}`,
         intentId: edge.id,
+        status: edge.status,
         description: edge.description,
         worker: edge.worker,
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + (occupied + index) * (NODE_HEIGHT + ROW_GAP),
-        width: OPEN_WIDTH,
-        height: OPEN_HEIGHT,
+        width: INTENT_WIDTH,
+        height: INTENT_HEIGHT,
       }
-      stubs.push(stub)
+      intents.push(stub)
       maxBottom = Math.max(maxBottom, stub.y + stub.height)
     })
   }
 
-  const openCount = board.intents.filter((intent) => intent.to === null).length
-  const claimedCount = board.intents.filter((intent) => intent.to === null && intent.worker !== null).length
+  // Center short columns against the tallest branch, including pending intents.
+  const bottomByX = new Map<number, number>()
+  for (const item of [...nodes, ...intents]) {
+    bottomByX.set(item.x, Math.max(bottomByX.get(item.x) ?? 0, item.y + item.height))
+  }
+  const centered = <T extends GraphNode | GraphIntent>(item: T): T => ({
+    ...item,
+    y: item.y + (maxBottom - (bottomByX.get(item.x) ?? maxBottom)) / 2,
+  })
+
+  const openCount = board.intents.filter((intent) => intent.to === null && !intent.closed).length
+  const claimedCount = board.intents.filter((intent) => intent.to === null && !intent.closed && intent.worker !== null).length
   return {
     title: board.title,
     status: board.status,
     bootstrapEnabled: board.bootstrapEnabled,
-    nodes,
+    nodes: nodes.map(centered),
     edges,
-    stubs,
+    intents: intents.map(centered),
     hints: board.hints,
     reason: board.reason,
     factCount: board.facts.length,
@@ -296,6 +309,7 @@ export function edgePath(
 }
 
 function edgeStatus(intent: Intent): GraphEdge['status'] {
+  if (intent.closed) return 'closed'
   if (intent.to === GOAL_ID) return 'complete'
   if (intent.to !== null) return 'concluded'
   if (intent.worker !== null) return 'claimed'
@@ -310,7 +324,13 @@ function parseIntent(item: unknown): Intent | null {
   if (item.to !== null && typeof item.to !== 'string') return null
   if (item.worker !== null && typeof item.worker !== 'string') return null
   if (item.concludedAt !== null && typeof item.concludedAt !== 'string') return null
+  if (item.closed !== undefined && (!isRecord(item.closed) || typeof item.closed.reason !== 'string' || typeof item.closed.at !== 'string')) return null
   return {
+    ...(isRecord(item.closed) ? { closed: { reason: item.closed.reason as string, at: item.closed.at as string } } : {}),
+    ...(typeof item.target === 'string' ? { target: item.target } : {}),
+    ...(typeof item.dispatchId === 'string' ? { dispatchId: item.dispatchId } : {}),
+    ...(typeof item.subagentId === 'string' ? { subagentId: item.subagentId } : {}),
+    ...(item.pendingReturn === true ? { pendingReturn: true } : {}),
     id: item.id,
     from: item.from as string[],
     to: item.to,

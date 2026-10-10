@@ -183,7 +183,7 @@ function EntityForm({ base, category, onClose, onSaved }: { base: string; catego
   }}>
     <label>类型<select aria-label="类型" value={kind} onChange={e => { setKind(e.target.value as Kind); setSecret('') }}>{groupKinds[category].map(k => <option value={k} key={k}>{kinds[k]}</option>)}</select></label>
     <label>显示名称<input required maxLength={500} value={name} onChange={e => setName(e.target.value)} /></label><label>{sensitive.has(kind) ? '标识（账号/服务名称，不含敏感原值）' : '标识 / 值'}<input required maxLength={2048} value={identifier} onChange={e => setIdentifier(e.target.value)} /></label>
-    <label>所属域 / 系统{['account', 'person'].includes(kind) ? '（必填）' : ''}<input required={['account', 'person'].includes(kind)} maxLength={2048} value={namespace} onChange={e => setNamespace(e.target.value)} /></label>
+    <label>所属域 / 系统{['account', 'person', 'employee_id', 'student_id', 'user_id'].includes(kind) ? '（必填）' : ''}<input required={['account', 'person', 'employee_id', 'student_id', 'user_id'].includes(kind)} maxLength={2048} value={namespace} onChange={e => setNamespace(e.target.value)} /></label>
     {sensitive.has(kind) && <label>敏感原值<input type="password" autoComplete="new-password" required maxLength={16384} value={secret} onChange={e => setSecret(e.target.value)} /></label>}
     <label>发现依据<textarea maxLength={8000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><label>备注<textarea maxLength={4000} value={note} onChange={e => setNote(e.target.value)} /></label>
     <p className="intel-muted">新增状态为“未验证”。敏感原值仅填写在专用字段中。</p>{error && <p role="alert">{error}</p>}<button disabled={busy} className="intel-primary">{busy ? '保存中…' : '保存'}</button>
