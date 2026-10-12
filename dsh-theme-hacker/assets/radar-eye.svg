@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 72" fill="currentColor">
+  <path d="M8 29C34 2 54 0 108 5C67 1 40 10 8 29Z"/>
+  <path d="M2 36L30 19C22 27 19 33 18 37C25 48 37 56 51 59C29 57 14 48 2 36Z"/>
+  <path d="M47 11C71 8 93 28 113 36C98 50 84 62 66 68C81 57 92 47 99 36C85 23 67 12 47 11Z"/>
+  <path d="M91 35L96 36C87 51 74 62 60 68C47 69 34 67 23 65C51 68 74 57 91 35Z"/>
+  <defs>
+    <mask id="radar-eye-cutout" maskUnits="userSpaceOnUse" x="30" y="12" width="48" height="48">
+      <path d="M30 12H78V60H30Z" fill="white"/>
+      <path d="M67 17L60 28L62 32L59 35L62 40L57 49L66 40L63 35L66 32L64 28L72 19Z" fill="black"/>
+    </mask>
+  </defs>
+  <path d="M71 36A17 17 0 1 1 37 36A17 17 0 1 1 71 36ZM64.5 36A10.5 10.5 0 1 0 43.5 36A10.5 10.5 0 1 0 64.5 36Z" fill-rule="evenodd" mask="url(#radar-eye-cutout)"/>
+  <circle cx="54" cy="36" r="3.5"/>
+  <path d="M53 14H55V24H53ZM32 35H43V37H32ZM65 35H76V37H65ZM53 49H55V59H53Z"/>
+  <path d="M83 10H110L114 14H89ZM95 19H105L109 23H101ZM91 56H104L101 59H87ZM82 62H96L91 66H76Z"/>
+</svg>
