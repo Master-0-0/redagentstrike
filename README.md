@@ -264,3 +264,28 @@ PoC 自动归档队列和待提交文件副本保存在当前站点的浏览器 
 在「漏洞成果库」点击「手工新增」旁的「导出报告」，搜索并勾选需要的成果，选择 DOCX 或 PDF 后下载。支持跨页保留选择、全选本页和清空选择，单次最多 100 项，合并为一份报告。导出包括漏洞说明、复现步骤、人工复核与修复状态、文本及图片证据、证据索引和缺口。文本正文展示前 64 KiB，超限明确提示；PNG/JPEG 图片嵌入正文。其他附件仍在成果详情中下载，导出不改变状态，也不遮盖保存的凭据。
 
 后端新增依赖 `python-docx` 与 `reportlab`，更新后安装 `backend/pyproject.toml` 中的依赖并重启后端。PDF 嵌入中文 TrueType 字体：macOS 默认读取 `/Library/Fonts/Arial Unicode.ttf`；其他环境可设置 `WORKBENCH_REPORT_FONT`，或使用系统中的文泉驿正黑/宋体。缺少字体时明确报错。DOCX 使用 Arial Unicode MS 字体样式，阅读器可按本机字体替换。
+
+# 截图预览
+
+<p>
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/da42f7a9-08ff-4cb0-b43b-799eb9ed92a4" />
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/d3e15d97-8573-441d-8334-8ed4c848f7cc" />
+</p>
+
+<p>
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/a57d3da6-3385-40e2-8656-200eece97dac" />
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/14482a52-6aed-40c0-b0e4-a5ff7b4e90d3" />
+</p>
+
+<p>
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/b6fefdcf-d60c-4d4b-b284-8ea6aa29b59d" />
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/bbae65f7-9a2c-4ffb-9a93-f85566eeb0c0" />
+</p>
+
+<p>
+  <img width="49%" alt="image" src="https://github.com/user-attachments/assets/ee600030-4fd6-4972-b99d-45cec3334c00" />
+</p>
+
+## tsecbench 跑分测试
+
+<img width="1469" height="799" alt="image" src="https://github.com/user-attachments/assets/c4a3d334-dbd9-4855-a90f-e772b7e9a680" />
