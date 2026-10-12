@@ -28,6 +28,8 @@ await build({
   bundle: true,
   format: 'cjs',
   platform: 'browser',
+  external: ['react'],
+  loader: { '.svg': 'text' },
   target: 'es2022',
   logLevel: 'info',
 })

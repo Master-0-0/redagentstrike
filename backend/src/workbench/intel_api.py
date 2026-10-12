@@ -66,7 +66,11 @@ async def workspaces(request: Request):
 
 @router.post('/workspaces')
 async def create_workspace(request: Request):
-    return await action(request, lambda st, b, *_: st.workspace(b.path, b.title), Workspace)
+    return await action(request, lambda st, b, *_: st.workspace(b.path, b.title, restore=True), Workspace)
+
+@router.delete('/workspaces/{wid}')
+async def delete_workspace(wid: str, request: Request):
+    return await action(request, lambda st, b, w, c: st.delete_workspace(w), wid=wid)
 
 @router.post('/workspaces/{wid}/query')
 async def query(wid: str, request: Request):

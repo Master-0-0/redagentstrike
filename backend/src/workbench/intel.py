@@ -58,6 +58,7 @@ class IntelStore:
         self.db.row_factory = sqlite3.Row
         self.db.executescript('''
         PRAGMA foreign_keys=ON;
+        CREATE TABLE IF NOT EXISTS deleted_workspaces(path TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS workspaces(id TEXT PRIMARY KEY,path TEXT UNIQUE NOT NULL,title TEXT NOT NULL,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS entities(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id),identity_key TEXT NOT NULL,category TEXT NOT NULL,kind TEXT NOT NULL,name TEXT NOT NULL,identifier TEXT NOT NULL,namespace TEXT NOT NULL,secret BLOB,note BLOB NOT NULL,status TEXT NOT NULL,manual_status INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL,first_seen TEXT NOT NULL,last_seen TEXT NOT NULL,UNIQUE(workspace_id,identity_key));
         CREATE TABLE IF NOT EXISTS relations(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id),from_id TEXT NOT NULL REFERENCES entities(id),to_id TEXT NOT NULL REFERENCES entities(id),label TEXT NOT NULL,basis TEXT NOT NULL,evidence BLOB NOT NULL,created_at TEXT NOT NULL,UNIQUE(workspace_id,from_id,to_id,label,basis));
@@ -82,17 +83,33 @@ class IntelStore:
     def fingerprint(self, value):
         return hmac.new(self.key, value.encode(), hashlib.sha256).hexdigest()
 
-    def workspace(self, path, title=None):
+    def workspace(self, path, title=None, *, restore=False):
         p = Path(path).expanduser().resolve()
         if not p.is_dir():
             raise IntelError('workspace_directory_missing')
         with self.lock, self.db:
+            if restore:
+                self.db.execute('DELETE FROM deleted_workspaces WHERE path=?', (str(p),))
+            elif self.db.execute('SELECT 1 FROM deleted_workspaces WHERE path=?', (str(p),)).fetchone():
+                raise IntelError('workspace_deleted', 409)
             row = self.db.execute('SELECT * FROM workspaces WHERE path=?', (str(p),)).fetchone()
             if row:
                 return dict(row)
             row = dict(id=uid(), path=str(p), title=title or p.name, created_at=now())
             self.db.execute('INSERT INTO workspaces VALUES(:id,:path,:title,:created_at)', row)
             return row
+
+    def delete_workspace(self, wid):
+        with self.lock, self.db:
+            self.require_workspace(wid)
+            self.db.execute('INSERT OR IGNORE INTO deleted_workspaces SELECT path FROM workspaces WHERE id=?', (wid,))
+            # Older databases may retain retractions referencing relation rows.
+            if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='relation_retractions'").fetchone():
+                self.db.execute('DELETE FROM relation_retractions WHERE relation_id IN (SELECT id FROM relations WHERE workspace_id=?)', (wid,))
+            for table in ('relations', 'observations', 'audit', 'submissions', 'entities'):
+                self.db.execute(f'DELETE FROM {table} WHERE workspace_id=?', (wid,))
+            self.db.execute('DELETE FROM workspaces WHERE id=?', (wid,))
+            return dict(ok=True)
 
     def workspaces(self):
         with self.lock:
@@ -114,6 +131,7 @@ class IntelStore:
 
     def record_failure(self, wid, context, operation, code):
         with self.lock, self.db:
+            self.require_workspace(wid)
             self.audit(wid, context, operation, 'failed', error=code)
 
     def save(self, wid, body: Save, context):

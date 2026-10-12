@@ -7,6 +7,7 @@ const message = (e: unknown) => e instanceof Error ? e.message : '请求失败'
 const operations: Record<string, string> = { save_intel: '保存发现', query_intel_lib: '查询摘要', read_secret: '读取原值', edit: '人工修改', query: '查询' }
 
 export function IntelPage() {
+  const catalogVersion = useRef(0)
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [selected, setSelected] = useState(() => localStorage.getItem('intel-workspace') || '')
   const [filter, setFilter] = useState('')
@@ -21,8 +22,9 @@ export function IntelPage() {
       if (running || document.hidden) return
       running = true
       try {
+        const version = catalogVersion.current
         const data = await intel<{ items: Workspace[] }>('/workspaces', { signal: controller.signal })
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || version !== catalogVersion.current) return
         setWorkspaces(data.items)
         setSelected(old => data.items.some(w => w.id === old) ? old : data.items[0]?.id || '')
         setError('')
@@ -34,7 +36,7 @@ export function IntelPage() {
     document.addEventListener('visibilitychange', pull)
     return () => { controller.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', pull) }
   }, [refresh])
-  useEffect(() => { if (selected) localStorage.setItem('intel-workspace', selected) }, [selected])
+  useEffect(() => { if (selected) localStorage.setItem('intel-workspace', selected); else localStorage.removeItem('intel-workspace') }, [selected])
   const workspace = workspaces.find(w => w.id === selected)
   return <section className="intel-shell">
     <aside className="intel-workspaces" aria-label="情报工作区导航">
@@ -49,13 +51,14 @@ export function IntelPage() {
     </aside>
     <div className="intel-main">
       {error && <div role="alert" className="intel-error">{error}<button onClick={() => setRefresh(r => r + 1)}>重试</button></div>}
-      {workspace ? <WorkspacePanel key={workspace.id} workspace={workspace} /> : <div className="intel-empty"><h2>{loading ? '正在加载工作区…' : '选择或创建一个工作区'}</h2><p>资产、凭据、身份与 Agent 读写记录按工作区组织。</p></div>}
+      {workspace ? <WorkspacePanel key={workspace.id} workspace={workspace} onDeleted={() => { catalogVersion.current += 1; setWorkspaces(old => old.filter(w => w.id !== workspace.id)); setSelected(workspaces.find(w => w.id !== workspace.id)?.id || ''); setRefresh(r => r + 1) }} /> : <div className="intel-empty"><h2>{loading ? '正在加载工作区…' : '选择或创建一个工作区'}</h2><p>资产、凭据、身份与 Agent 读写记录按工作区组织。</p></div>}
     </div>
     {creating && <WorkspaceForm onClose={() => setCreating(false)} onSaved={w => { setSelected(w.id); setWorkspaces(old => [...old.filter(x => x.id !== w.id), { ...w, count: 0 }]); setCreating(false); setRefresh(r => r + 1) }} />}
   </section>
 }
 
-function WorkspacePanel({ workspace }: { workspace: Workspace }) {
+function WorkspacePanel({ workspace, onDeleted }: { workspace: Workspace; onDeleted: () => void }) {
+  const [deleting, setDeleting] = useState(false)
   const base = '/workspaces/' + workspace.id
   const [view, setView] = useState<View>('assets')
   const [q, setQ] = useState(''), [kind, setKind] = useState(''), [status, setStatus] = useState('')
@@ -96,7 +99,8 @@ function WorkspacePanel({ workspace }: { workspace: Workspace }) {
     catch (e) { setError(message(e)) }
   }
   return <>
-    <header className="intel-head"><div><div className="intel-eyebrow">WORKSPACE</div><h2>{workspace.title}</h2><p>{workspace.path}</p></div><span className="intel-sync">{updated ? `自动更新 · ${updated}` : '正在连接'}</span></header>
+    <header className="intel-head"><div><div className="intel-eyebrow">WORKSPACE</div><h2>{workspace.title}</h2><p>{workspace.path}</p></div><span className="intel-sync">{updated ? `自动更新 · ${updated}` : '正在连接'}</span><button className="intel-danger" onClick={() => setDeleting(true)}>删除工作区</button></header>
+    {deleting && <DeleteWorkspace workspace={workspace} onClose={() => setDeleting(false)} onDeleted={onDeleted} />}
     <nav className="intel-tabs" aria-label="工作区情报分类">{Object.entries(categories).map(([key, label]) => <button key={key} aria-pressed={view === key} onClick={() => switchView(key as View)}>{label}</button>)}</nav>
     <div className="intel-toolbar">
       {view !== 'activity' ? <><input aria-label="搜索情报" placeholder="搜索名称、标识、所属域…" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} />
@@ -165,7 +169,23 @@ function EntityPanel({ base, id, onClose, onNavigate, onChanged }: { base: strin
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => { dialog.current?.showModal(); return () => dialog.current?.close() }, [])
-  return <dialog ref={dialog} className="intel-modal" onCancel={onClose} aria-label={title}><div className="intel-detail-head"><h3>{title}</h3><button onClick={onClose}>关闭</button></div>{children}</dialog>
+  return <dialog ref={dialog} className="intel-modal" onCancel={e => { e.preventDefault(); onClose() }} aria-label={title}><div className="intel-detail-head"><h3>{title}</h3><button onClick={onClose}>关闭</button></div>{children}</dialog>
+}
+function DeleteWorkspace({ workspace, onClose, onDeleted }: { workspace: Workspace; onClose: () => void; onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  return <Modal title="删除情报工作区" onClose={() => { if (!busy) onClose() }}><form onSubmit={async e => {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true); setError('')
+    try { await intel('/workspaces/' + encodeURIComponent(workspace.id), { method: 'DELETE' }); onDeleted() }
+    catch (err) { setError(message(err)) }
+    finally { setBusy(false) }
+  }}>
+    <p>确定删除工作区「{workspace.title}」？其全部情报、关联、观察记录与 Agent 读写记录将永久删除，无法恢复。</p>
+    <p className="intel-muted">本机项目文件与 Harness 工作区会保留。删除后不会自动接入；如需再次使用，请手动新建同目录的情报工作区。</p>
+    {error && <p role="alert">{error}</p>}
+    <button type="button" disabled={busy} onClick={onClose}>取消</button><button className="intel-danger" disabled={busy}>{busy ? '删除中…' : '确认删除'}</button>
+  </form></Modal>
 }
 function WorkspaceForm({ onClose, onSaved }: { onClose: () => void; onSaved: (w: Workspace) => void }) {
   const [title, setTitle] = useState(''), [path, setPath] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)

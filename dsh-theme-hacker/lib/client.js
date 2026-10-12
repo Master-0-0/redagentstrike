@@ -26,6 +26,10 @@ __export(index_exports, {
   name: () => name
 });
 module.exports = __toCommonJS(index_exports);
+var import_react = require("react");
+
+// assets/radar-eye.svg
+var radar_eye_default = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 72" fill="currentColor">\n  <path d="M8 29C34 2 54 0 108 5C67 1 40 10 8 29Z"/>\n  <path d="M2 36L30 19C22 27 19 33 18 37C25 48 37 56 51 59C29 57 14 48 2 36Z"/>\n  <path d="M47 11C71 8 93 28 113 36C98 50 84 62 66 68C81 57 92 47 99 36C85 23 67 12 47 11Z"/>\n  <path d="M91 35L96 36C87 51 74 62 60 68C47 69 34 67 23 65C51 68 74 57 91 35Z"/>\n  <defs>\n    <mask id="radar-eye-cutout" maskUnits="userSpaceOnUse" x="30" y="12" width="48" height="48">\n      <path d="M30 12H78V60H30Z" fill="white"/>\n      <path d="M67 17L60 28L62 32L59 35L62 40L57 49L66 40L63 35L66 32L64 28L72 19Z" fill="black"/>\n    </mask>\n  </defs>\n  <path d="M71 36A17 17 0 1 1 37 36A17 17 0 1 1 71 36ZM64.5 36A10.5 10.5 0 1 0 43.5 36A10.5 10.5 0 1 0 64.5 36Z" fill-rule="evenodd" mask="url(#radar-eye-cutout)"/>\n  <circle cx="54" cy="36" r="3.5"/>\n  <path d="M53 14H55V24H53ZM32 35H43V37H32ZM65 35H76V37H65ZM53 49H55V59H53Z"/>\n  <path d="M83 10H110L114 14H89ZM95 19H105L109 23H101ZM91 56H104L101 59H87ZM82 62H96L91 66H76Z"/>\n</svg>\n';
 
 // src/tokens.ts
 function pair(value) {
@@ -168,8 +172,32 @@ var BOOT_CSS = `html{color-scheme:light}body{background:${bgBase};--dsw-alias-bg
 
 // src/client/index.ts
 var name = "dsh-theme-hacker";
-var inject = ["theme"];
+var inject = ["theme", "slots"];
+var artwork = radar_eye_default.replace(/<svg[^>]*>/, "").replace("</svg>", "");
+function RadarEye({ size, className }) {
+  const maskId = `radar-eye-${(0, import_react.useId)()}`;
+  return (0, import_react.createElement)("svg", {
+    width: size,
+    height: size * 0.6,
+    viewBox: "0 0 120 72",
+    fill: "currentColor",
+    className,
+    "aria-hidden": true,
+    "data-brand": "radar-eye",
+    style: { color: "var(--dsw-alias-label-primary)", display: "block" },
+    dangerouslySetInnerHTML: { __html: artwork.replaceAll("radar-eye-cutout", maskId) }
+  });
+}
+function RadarBrandName() {
+  return (0, import_react.createElement)("span", {
+    style: { fontSize: 17, fontWeight: 600, letterSpacing: "0.12em", whiteSpace: "nowrap" }
+  }, "\u65E0\u76F8\u4E4B\u77B3");
+}
 function apply(ctx) {
+  ctx.slots.inject("sidebar.brand.name", () => ctx.slots.register({ name: "sidebar.brand.name", priority: -10 }, RadarBrandName));
+  for (const name2 of ["sidebar.brand.mark", "conversation.hero.brand.mark"]) {
+    ctx.slots.inject(name2, () => ctx.slots.register({ name: name2, priority: -10 }, RadarEye));
+  }
   ctx.effect(
     () => ctx.theme.overrideTokens("dsh-theme-hacker", themeTokens),
     "dsh-theme-hacker: tokens"
