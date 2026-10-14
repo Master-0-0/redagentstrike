@@ -7,7 +7,8 @@ def test_proxy_env_sets_proxy_and_no_proxy(settings, tmp_path):
     env = proxy_env(settings)
     assert env["HTTP_PROXY"].endswith(":18080")
     assert env["HTTPS_PROXY"] == env["HTTP_PROXY"]
-    assert "127.0.0.1" in env["NO_PROXY"]
+    assert env["NO_PROXY"] == ""
+    assert env["no_proxy"] == ""
     assert env["SSL_CERT_FILE"].endswith("combined-ca.pem")
     assert env["NODE_EXTRA_CA_CERTS"] == str(ca)
     assert env["NODE_USE_ENV_PROXY"] == "1"

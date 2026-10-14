@@ -18,6 +18,7 @@ export interface Intent {
   readonly createdAt: string
   readonly closed?: { readonly reason: string; readonly at: string }
   readonly target?: string
+  readonly invalidated?: { readonly at: string; readonly hintId: string }
   readonly pendingReturn?: boolean
   readonly dispatchId?: string
   readonly subagentId?: string
@@ -30,6 +31,19 @@ export interface Hint {
   readonly creator: string
   readonly createdAt: string
   readonly messageId?: string
+}
+
+export interface WorkerReturn {
+  readonly id: string
+  readonly kind: 'return' | 'observation'
+  readonly content: string
+  readonly createdAt: string
+  readonly messageId?: string
+  readonly subagentId?: string
+  readonly intentId?: string
+  readonly dispatchId?: string
+  readonly observation?: string
+  readonly resolution?: { readonly action: 'conclude' | 'release' | 'close' | 'recovered' | 'archived'; readonly at: string }
 }
 
 export interface ReasonLease {
@@ -50,12 +64,16 @@ export interface Board {
   bootstrapEnabled: boolean
   facts: Fact[]
   intents: Intent[]
+  workerReturns?: WorkerReturn[]
   hints: Hint[]
   reason: ReasonLease | null
+  pendingIntentsEmpty?: boolean
+  workerStatusWarning?: string
   checkpoint: Checkpoint
 }
 
 export type NextTask =
+  | { kind: 'review'; intents: Intent[]; records: WorkerReturn[] }
   | { kind: 'bootstrap'; origin: string; goal: string; hints: Hint[] }
   | { kind: 'reason'; trigger: ReasonLease['trigger']; factIds: string[]; openIntents: Intent[] }
   | { kind: 'explore'; intent: Intent }

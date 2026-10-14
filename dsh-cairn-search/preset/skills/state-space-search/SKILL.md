@@ -37,6 +37,7 @@ Call `blackboard` with the `op` discriminator. Do not hand-edit YAML or JSON to 
 | --- | --- |
 | First turn of a new problem | `op=init` with `title`, `origin`, `goal`, optional `hints` |
 | After every write | Execute the returned `next`; call `op=next` whenever you need refreshed work |
+| `next` says `review` | Inspect `records` and the actual child outcome; `conclude`, `release`, or `close` the associated intent. Unknown status is not a fact. |
 | `next` says `reason` | `op=reason_start`, think on the snapshot, then `op=reason_finish` |
 | `next` says `explore` | `op=claim`, spawn one subagent, then `op=conclude` (or `op=release` on failure) |
 | Human message arrives mid-search | Runtime records human inbox messages as hints; use `op=hint` for other external judgments |
@@ -44,12 +45,13 @@ Call `blackboard` with the `op` discriminator. Do not hand-edit YAML or JSON to 
 | Direction abandoned or replaced | `op=close` with `intentId` and a factual `description` explaining why; no invented fact |
 | Need the current board without scheduling | `op=snapshot` |
 | Resume a stopped board | `op=reopen` |
+| Revisit a completed goal after explicit feedback | `op=reopen` with non-empty `description`; prior completion is retained as invalidated history |
 
 `init` then loop `next` until `idle` or the board is `completed` / `stopped`.
 
 ## Scheduler
 
-Same worker type, three tasks. `next` chooses; the parent executes.
+Same worker type, three search tasks plus a prioritized return review. `next` chooses; the parent executes.
 
 1. **Bootstrap** — `next.kind` is `bootstrap`. The parent itself tries the whole origin→goal problem (do not spawn a subagent). If the goal is definitively met, `conclude` the reserved bootstrap intent with the proving fact, then `reason_finish` with `complete`. If not, `conclude` with the best confirmed fact only (never `complete` on a bootstrap miss), then `next` again.
 2. **Reason** — `next.kind` is `reason`. Call `reason_start` (worker `parent`). Reason **may run while explores are in flight**. The trigger is taken at **reason start**: fact count up, hint count up, or open intents went `>0 → 0`. Declaring new intents does **not** retrigger reason. After thinking, `reason_finish` with exactly one of:
@@ -59,7 +61,7 @@ Same worker type, three tasks. `next` chooses; the parent executes.
    If open intents is empty and the goal is unmet, you **must** propose intents.
 3. **Explore** — `next.kind` is `explore`. Claim the newest unclaimed non-bootstrap open intent **before** spawning. Spawn one subagent for that intent only. The child returns **one** objective fact, including a negative finding. The parent writes it with `conclude`. On timeout, crash, or refusal to explore, `release` (clear worker, leave `to` null). Release is **not** a reason trigger.
 
-Priority after leaving the initial state: if `next` says reason, reason even if explores are still in flight; otherwise consume the newest claimable explore. Start independent explores in one turn; do not wait for one before claiming another.
+Review takes priority in every active state. After reviews, if `next` says reason, reason even if explores are still in flight; otherwise consume the newest claimable explore. Start independent explores in one turn; do not wait for one before claiming another.
 
 ## Explore subagent prompt
 
@@ -98,6 +100,14 @@ Each new intent needs one stable `target` subgoal key, not a queue of unrelated 
 
 Conclude one distilled objective finding at a time, including negative findings. Reference evidence files instead of embedding execution transcripts. Pass `supersedes: ["fNNN"]` to explicitly replace an outdated finding. History remains visible but superseded facts cannot justify new intents or completion. Existing historical boards are not rewritten automatically.
 
-Every tool mutation returns `next` and quality warnings. Resolve returned workers before spawning more exploration. Runtime records settlement as a hint and marks the corresponding intent pending; the parent must review and conclude, release or close it. Spawn failures release their reservation automatically. Child sessions cannot write the board or dispatch further explorers.
+Every tool mutation returns `next` and quality warnings. Resolve returned workers before spawning more exploration. Runtime records settlement in `workerReturns`, separately from human hints, and marks the current matching intent pending; the parent must review and conclude, release or close it. Spawn failures release their reservation automatically. Child sessions cannot write the board or dispatch further explorers.
 
-Completion requires an observed fact (not origin alone) and no open intents. Independently check every goal criterion against the referenced evidence; the engine cannot verify natural-language truth. On external task expiry or termination call `stop`, even if the goal is unmet. Stop interrupts bound continuable workers; ordinary parent idleness does not mean the external task ended. Do not reopen a completed board just to append unrelated work. Human hints remain writable after stop.
+Completion requires an observed fact (not origin alone) and no open intents. Independently check every goal criterion against the referenced evidence; the engine cannot verify natural-language truth. On external task expiry or termination call `stop`, even if the goal is unmet. Stop interrupts bound continuable workers; ordinary parent idleness does not mean the external task ended. Do not reopen a completed board just to append unrelated work. Human hints remain writable after stop. Late worker returns are archived without resuming work or creating facts.
+
+## Return review and recovery
+
+`workerReturns` preserves raw foreground/background output and status observations. Existing historical hints are unchanged. New worker notifications and closure reasons do not become hints. Only a reviewed `conclude` creates a fact; closing the final open intent still triggers reasoning.
+
+Before parent steps and on `snapshot`/`next`, the runtime checks bound children through the Harness catalog. `inactive`, missing children and diagnostic rows indicate uncertain outcomes, not proven failure. Inspect the child's actual result before concluding, releasing or closing; continue observing if unsure. A failed catalog query retains claims and returns a warning. There is no automatic retry, timeout release, or synthesized finding. Recovered observations clear without erasing their history. Claims with unfinished spawn calls are excluded from recovery checks.
+
+To reopen a completed goal, require explicit feedback and pass it as `description`. The feedback becomes a hint, not a verified fact. The prior completion remains visible as invalidated history; the next reason cycle must reevaluate the evidence. Calling reopen again on an active board is a no-op. Unrelated goals should use a new board.

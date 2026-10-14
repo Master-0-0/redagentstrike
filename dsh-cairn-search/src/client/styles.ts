@@ -283,6 +283,12 @@ const CSS = `
   white-space: pre-wrap;
   word-break: break-word;
 }
+.dsh-bb-returns { margin-top: 16px; }
+.dsh-bb-returns details { padding: 8px 0; }
+.dsh-bb-returns summary { cursor: pointer; overflow-wrap: anywhere; }
+.dsh-bb-returns pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.dsh-bb-edge[data-status="invalidated"] { opacity: .4; stroke-dasharray: 5 5; }
+.dsh-bb-intent[data-status="invalidated"] { opacity: .6; }
 .dsh-bb-hints {
   margin: 8px 4px 0;
 }

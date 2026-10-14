@@ -3,7 +3,7 @@
  * Domain mutations stay in `board.ts`; this module is read-only presentation.
  */
 
-import type { Board, Fact, Hint, Intent, ProjectStatus, ReasonLease } from './types.ts'
+import type { Board, Fact, Hint, Intent, ProjectStatus, ReasonLease, WorkerReturn } from './types.ts'
 import { GOAL_ID, ORIGIN_ID } from './types.ts'
 
 const NODE_WIDTH = 240
@@ -32,7 +32,7 @@ export interface GraphEdge {
   readonly from: readonly string[]
   readonly to: string | null
   readonly description: string
-  readonly status: 'open' | 'claimed' | 'concluded' | 'complete' | 'closed'
+  readonly status: 'open' | 'claimed' | 'concluded' | 'complete' | 'closed' | 'invalidated'
   readonly worker: string | null
   readonly creator: string
 }
@@ -58,6 +58,7 @@ export interface BoardView {
   readonly nodes: readonly GraphNode[]
   readonly edges: readonly GraphEdge[]
   readonly intents: readonly GraphIntent[]
+  readonly workerReturns: readonly WorkerReturn[]
   readonly hints: readonly Hint[]
   readonly reason: ReasonLease | null
   readonly factCount: number
@@ -117,6 +118,8 @@ export function parseBoard(text: string): Board | null {
       ...(typeof item.messageId === 'string' ? { messageId: item.messageId } : {}),
     })
   }
+  const workerReturns = value.workerReturns ?? []
+  if (!Array.isArray(workerReturns) || !workerReturns.every(validWorkerReturn)) return null
   const reason = parseReason(value.reason)
   if (reason === undefined) return null
   if (!isRecord(value.checkpoint)) return null
@@ -131,6 +134,9 @@ export function parseBoard(text: string): Board | null {
     facts,
     intents,
     hints,
+    workerReturns,
+    ...(value.pendingIntentsEmpty === true ? { pendingIntentsEmpty: true } : {}),
+    ...(typeof value.workerStatusWarning === 'string' ? { workerStatusWarning: value.workerStatusWarning } : {}),
     reason,
     checkpoint: { factCount, hintCount, hadOpenIntents },
   }
@@ -150,7 +156,7 @@ export function layoutBoard(board: Board): BoardView {
     if (held !== undefined) return held
     if (visiting.has(id)) return 1
     visiting.add(id)
-    const incoming = board.intents.filter((intent) => intent.to === id)
+    const incoming = board.intents.filter((intent) => intent.to === id && !intent.invalidated)
     const col = incoming.length === 0
       ? 2
       : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
@@ -199,7 +205,7 @@ export function layoutBoard(board: Board): BoardView {
     id: intent.id,
     from: intent.from,
     to: intent.to,
-    description: intent.closed ? `${intent.description}\nClosed: ${intent.closed.reason}` : intent.description,
+    description: intent.invalidated ? `${intent.description}\nHistorical completion invalidated: ${intent.invalidated.at} (${intent.invalidated.hintId})` : intent.closed ? `${intent.description}\nClosed: ${intent.closed.reason}` : intent.description,
     status: edgeStatus(intent),
     worker: intent.worker,
     creator: intent.creator,
@@ -254,6 +260,7 @@ export function layoutBoard(board: Board): BoardView {
     edges,
     intents: intents.map(centered),
     hints: board.hints,
+    workerReturns: board.workerReturns ?? [],
     reason: board.reason,
     factCount: board.facts.length,
     openCount,
@@ -309,6 +316,7 @@ export function edgePath(
 }
 
 function edgeStatus(intent: Intent): GraphEdge['status'] {
+  if (intent.invalidated) return 'invalidated'
   if (intent.closed) return 'closed'
   if (intent.to === GOAL_ID) return 'complete'
   if (intent.to !== null) return 'concluded'
@@ -325,7 +333,9 @@ function parseIntent(item: unknown): Intent | null {
   if (item.worker !== null && typeof item.worker !== 'string') return null
   if (item.concludedAt !== null && typeof item.concludedAt !== 'string') return null
   if (item.closed !== undefined && (!isRecord(item.closed) || typeof item.closed.reason !== 'string' || typeof item.closed.at !== 'string')) return null
+  if (item.invalidated !== undefined && (!isRecord(item.invalidated) || typeof item.invalidated.at !== 'string' || typeof item.invalidated.hintId !== 'string')) return null
   return {
+    ...(isRecord(item.invalidated) ? { invalidated: { at: item.invalidated.at as string, hintId: item.invalidated.hintId as string } } : {}),
     ...(isRecord(item.closed) ? { closed: { reason: item.closed.reason as string, at: item.closed.at as string } } : {}),
     ...(typeof item.target === 'string' ? { target: item.target } : {}),
     ...(typeof item.dispatchId === 'string' ? { dispatchId: item.dispatchId } : {}),
@@ -361,4 +371,14 @@ function isStatus(value: unknown): value is ProjectStatus {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function validWorkerReturn(value: unknown): value is WorkerReturn {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.content !== 'string' || typeof value.createdAt !== 'string') return false
+  if (value.kind !== 'return' && value.kind !== 'observation') return false
+  for (const key of ['messageId', 'subagentId', 'intentId', 'dispatchId', 'observation']) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') return false
+  }
+  return value.resolution === undefined || (isRecord(value.resolution) && typeof value.resolution.at === 'string'
+    && ['conclude', 'release', 'close', 'recovered', 'archived'].includes(value.resolution.action as string))
 }

@@ -18,6 +18,16 @@ Read-modify-write operations are serialized per board in one plugin module insta
 
 - Natural-language truth, atomicity, causal necessity and completeness against an external task inventory still require evidence review. Target keys detect exact overlap, not arbitrary semantic overlap. Missing historical results cannot be reconstructed from counts.
 - External platform termination is not a Harness goal event. Its adapter or the parent must call `stop`; ordinary parent idleness must not freeze a running task.
-- Settlement reconciliation happens when the parent consumes its inbox. A host crash requires recovery via snapshot/release/close. One-shot background job lifecycle is not bound like continuable children; use the preset's continuable spawn or foreground mode.
+- Settlement reconciliation happens when the parent consumes its inbox. Before parent steps and on snapshot/next, catalog reconciliation detects inactive, missing or diagnostically unreadable children for parent review. Activity is not an outcome: no automatic release or retry occurs. Query failures retain claims and return warnings. One-shot background job lifecycle is not bound like continuable children; use the preset's continuable spawn or foreground mode.
 - Process-local serialization does not coordinate independent host processes writing the same workspace, and is not a cross-process lock.
 - Rebuild/reload the plugin and install the updated preset skill to activate the protocol in a running deployment. Source changes alone do not restart the host.
+
+## Worker returns and feedback
+
+New settlement messages and foreground output are stored in optional `workerReturns`, not hints. Records retain raw content, message/dispatch/child/intent identifiers when known, and their disposition. Existing hints are never migrated or hidden, and their message IDs also suppress replay duplicates. Old files without the new array remain readable.
+
+`next.kind=review` takes priority over search tasks and returns pending intents plus unresolved records. The parent inspects the outcome and uses conclude/release/close; these atomically resolve the records. Status observations never prove success or failure. Repeated observations are deduplicated and recovered observations remain in history. Closing an intent stores its reason on that intent; closing the final open task explicitly triggers reason without a synthetic hint.
+
+Completed boards accept `reopen` only with non-empty feedback `description`. This appends a human feedback hint and marks the previous completion intent `invalidated` with its time and hint reference. Facts and historical completion links remain intact. New completion still requires observed evidence and no open work. Reopen on an active board is idempotent; stopped boards retain their existing resume behavior.
+
+Both board views show a separate collapsible worker-return section, filtered to the selected intent when applicable. Invalidated completion links are labeled and visually muted. No existing board files are batch-rewritten by this update.

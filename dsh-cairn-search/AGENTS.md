@@ -45,7 +45,9 @@ Resolve cwd from `exec.agent.session.header.cwd`. Owner id walks `origin === 'su
 - Explore failure / release: `worker=null`, `to` still null. That is **not** a reason trigger.
 - Bootstrap reserved intent: `from=["origin"]`, `description="bootstrap"`, `creator="dispatcher.bootstrap"`.
 - Bootstrap execute success: one fact + complete. Bootstrap conclude: fact only.
-- `stopped`: reject writes except hints. No conclude fallback.
+- `stopped`: reject graph writes; hints and archived worker returns remain writable. No conclude fallback.
+- Worker returns are separate from hints. `next=review` takes priority; only the parent concludes facts.
+- Completed boards reopen only with explicit feedback; retain old completion as invalidated history.
 - Negative findings are valid facts. Policy refusals are not facts.
 
 ## Tool `blackboard`
@@ -64,7 +66,7 @@ Single model-facing tool. `op` discriminator:
 | `hint` | content, creator? | hint |
 | `release` | intentId | intent |
 | `stop` | | board |
-| `reopen` | | board |
+| `reopen` | description required when completed | board + next |
 
 `complete` on reason_finish: `{ from: string[], description: string }`.
 `intents` on reason_finish: `{ from: string[], description: string }[]`.
