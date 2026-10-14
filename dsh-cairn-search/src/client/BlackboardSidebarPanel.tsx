@@ -1,3 +1,4 @@
+import { WorkerReturns } from './WorkerReturns.tsx'
 /**
  * Sidebar-foot blackboard entry: opens a graph of the selected session's
  * owned board (`.dsh/blackboards/<main-session-id>.json`), stacked above 子代理.
@@ -204,6 +205,7 @@ function panelBody({
           <p className="dsh-bb-detail-body">{detail.body}</p>
         </div>
       )}
+      <WorkerReturns view={view} selectedId={selectedId} t={t} />
       {view.hints.length > 0 && (
         <div className="dsh-bb-hints">
           <p className="dsh-bb-hints-title">{t('detail.hint')}</p>

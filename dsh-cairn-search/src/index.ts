@@ -32,7 +32,7 @@ import {
   type SessionLineage,
 } from './owner.ts'
 import { auditBoard } from './audit.ts'
-import { installRuntime, interruptWorkers } from './runtime.ts'
+import { installRuntime, interruptWorkers, reconcileWorkers } from './runtime.ts'
 import type { Board, Intent } from './types.ts'
 
 export const name = 'dsh-cairn-search'
@@ -58,12 +58,13 @@ const DESCRIPTION =
   + 'This tool is the only writer of that file. Subagent sessions share the main session\'s board; '
   + 'a forked conversation gets its own copy of the source snapshot. '
   + 'Call op=init once per main session (title, origin, goal, optional hints), then op=next to learn the next task '
-  + '(bootstrap, reason, explore, or idle). '
+  + '(review, bootstrap, reason, explore, or idle). '
   + 'Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). '
   + 'Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). '
   + 'Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. '
   + 'Use op=close with intentId and description to abandon or replace work without a fact. Use one target per intent and minimal direct from dependencies. '
   + 'Spawn prompts must begin with blackboard_intent: iNNN after claim. Record one distilled conclusion, including negative findings; use supersedes for corrections. '
+  + 'Review pending worker returns before other work; inspect unknown outcomes, then conclude, release or close. Returns are not hints or facts. Completed boards require feedback description to reopen; old completion stays as invalidated history. '
   + 'Every mutation returns next; execute it before starting more exploration. Complete requires observed facts and no open intents. '
   + 'Do not hand-edit the board file. Policy refusals are not facts.'
 
@@ -116,9 +117,9 @@ export function apply(ctx: Context): void {
         items: { type: 'string' },
         description: 'Optional starting hints (op=init).',
       },
-      intentId: { type: 'string', description: 'Intent id (op=claim, conclude, release).' },
+      intentId: { type: 'string', description: 'Intent id (op=claim, conclude, release, close).' },
       worker: { type: 'string', description: 'Worker label (op=claim, conclude, reason_start, reason_finish).' },
-      description: { type: 'string', description: 'Fact text (op=conclude).' },
+      description: { type: 'string', description: 'Fact text (conclude), closure reason (close), or required feedback when reopening a completed board (reopen).' },
       supersedes: { type: 'array', items: { type: 'string' }, description: 'Prior fact IDs replaced by this conclusion; preserve their history.' },
       content: { type: 'string', description: 'Hint text (op=hint).' },
       creator: { type: 'string', description: 'Hint author; defaults to user (op=hint).' },
@@ -168,6 +169,9 @@ export function apply(ctx: Context): void {
     async execute(args, exec) {
       const target = boardTarget(ctx, exec)
       const { cwd, ownerId } = target
+      if ((args.op === 'snapshot' || args.op === 'next') && exec.agent?.session.header.origin !== 'subagent') {
+        await reconcileWorkers(ctx, target)
+      }
       const result = await withBoardLock(cwd, ownerId, async () => {
         if (exec.agent?.session.header.origin === 'subagent' && args.op !== 'snapshot' && args.op !== 'next') {
           throw new Error('only the parent session may write the blackboard')
@@ -191,7 +195,7 @@ export function apply(ctx: Context): void {
           }
           case 'next': {
             const board = await requireBoard(target)
-            return { ok: true, op: args.op, next: nextTask(board) }
+            return { ok: true, op: args.op, next: nextTask(board), warnings: auditBoard(board) }
           }
           case 'claim': {
             const intentId = required(args.intentId, 'intentId')
@@ -257,7 +261,7 @@ export function apply(ctx: Context): void {
             return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
           }
           case 'reopen': {
-            const board = reopenBoard(await requireBoard(target))
+            const board = reopenBoard(await requireBoard(target), args.description)
             await saveBoard(cwd, ownerId, board)
             return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) }
           }

@@ -101,9 +101,10 @@ test('runtime gates spawn, binds child, captures inbox once and recovers failed 
     await step({ agent, messages }, async () => ({ kind: 'enter', messages }))
     await step({ agent, messages }, async () => ({ kind: 'enter', messages }))
     const b = (await loadBoard(cwd, 'p'))!
-    assert.equal(b.hints.length, 2)
+    assert.equal(b.hints.length, 1)
+    assert.equal(b.workerReturns?.length, 1)
     assert.equal(b.intents[1].pendingReturn, true)
-    assert.ok(auditBoard(b).some(w => w.includes('worker returned')))
+    assert.ok(auditBoard(b).some(w => w.includes('needs review')))
     await saveBoard(cwd, 'p', claimIntent(work(), 'i002', 'p'))
     await spawn(exec, async () => ({ isError: true, error: { message: 'failed' }, content: [] }))
     assert.equal((await loadBoard(cwd, 'p'))!.intents[1].worker, null)

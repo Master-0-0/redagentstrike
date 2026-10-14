@@ -27,6 +27,28 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 
+// src/client/WorkerReturns.tsx
+var import_jsx_runtime = require("react/jsx-runtime");
+function WorkerReturns({ view, selectedId, t }) {
+  const intentId = view.intents.find((i) => i.id === selectedId)?.intentId;
+  const records = view.workerReturns.filter((r) => !intentId || r.intentId === intentId);
+  if (!records.length) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "dsh-bb-returns", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "dsh-bb-hints-title", children: t("returns.title") }),
+    records.map((record) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("summary", { children: [
+        record.intentId ?? t("returns.unlinked"),
+        " \xB7 ",
+        t(`returns.${record.resolution?.action ?? "pending"}`),
+        " \xB7 ",
+        record.createdAt
+      ] }),
+      record.subagentId && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: record.subagentId }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: record.content })
+    ] }, record.id))
+  ] });
+}
+
 // src/client/BlackboardSidebarPanel.tsx
 var import_react2 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
@@ -138,6 +160,8 @@ function parseBoard(text) {
       ...typeof item.messageId === "string" ? { messageId: item.messageId } : {}
     });
   }
+  const workerReturns = value.workerReturns ?? [];
+  if (!Array.isArray(workerReturns) || !workerReturns.every(validWorkerReturn)) return null;
   const reason = parseReason(value.reason);
   if (reason === void 0) return null;
   if (!isRecord(value.checkpoint)) return null;
@@ -152,6 +176,9 @@ function parseBoard(text) {
     facts,
     intents,
     hints,
+    workerReturns,
+    ...value.pendingIntentsEmpty === true ? { pendingIntentsEmpty: true } : {},
+    ...typeof value.workerStatusWarning === "string" ? { workerStatusWarning: value.workerStatusWarning } : {},
     reason,
     checkpoint: { factCount, hintCount, hadOpenIntents }
   };
@@ -165,7 +192,7 @@ function layoutBoard(board) {
     if (held !== void 0) return held;
     if (visiting.has(id)) return 1;
     visiting.add(id);
-    const incoming = board.intents.filter((intent) => intent.to === id);
+    const incoming = board.intents.filter((intent) => intent.to === id && !intent.invalidated);
     const col = incoming.length === 0 ? 2 : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))));
     visiting.delete(id);
     columns.set(id, col);
@@ -209,7 +236,8 @@ function layoutBoard(board) {
     id: intent.id,
     from: intent.from,
     to: intent.to,
-    description: intent.closed ? `${intent.description}
+    description: intent.invalidated ? `${intent.description}
+Historical completion invalidated: ${intent.invalidated.at} (${intent.invalidated.hintId})` : intent.closed ? `${intent.description}
 Closed: ${intent.closed.reason}` : intent.description,
     status: edgeStatus(intent),
     worker: intent.worker,
@@ -261,6 +289,7 @@ Closed: ${intent.closed.reason}` : intent.description,
     edges,
     intents: intents.map(centered),
     hints: board.hints,
+    workerReturns: board.workerReturns ?? [],
     reason: board.reason,
     factCount: board.facts.length,
     openCount,
@@ -289,6 +318,7 @@ function edgePath(from, to) {
   return `M ${start.x} ${start.y} C ${mid} ${start.y}, ${mid} ${end.y}, ${end.x} ${end.y}`;
 }
 function edgeStatus(intent) {
+  if (intent.invalidated) return "invalidated";
   if (intent.closed) return "closed";
   if (intent.to === GOAL_ID) return "complete";
   if (intent.to !== null) return "concluded";
@@ -304,7 +334,9 @@ function parseIntent(item) {
   if (item.worker !== null && typeof item.worker !== "string") return null;
   if (item.concludedAt !== null && typeof item.concludedAt !== "string") return null;
   if (item.closed !== void 0 && (!isRecord(item.closed) || typeof item.closed.reason !== "string" || typeof item.closed.at !== "string")) return null;
+  if (item.invalidated !== void 0 && (!isRecord(item.invalidated) || typeof item.invalidated.at !== "string" || typeof item.invalidated.hintId !== "string")) return null;
   return {
+    ...isRecord(item.invalidated) ? { invalidated: { at: item.invalidated.at, hintId: item.invalidated.hintId } } : {},
     ...isRecord(item.closed) ? { closed: { reason: item.closed.reason, at: item.closed.at } } : {},
     ...typeof item.target === "string" ? { target: item.target } : {},
     ...typeof item.dispatchId === "string" ? { dispatchId: item.dispatchId } : {},
@@ -333,9 +365,17 @@ function isStatus(value) {
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
+function validWorkerReturn(value) {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.content !== "string" || typeof value.createdAt !== "string") return false;
+  if (value.kind !== "return" && value.kind !== "observation") return false;
+  for (const key of ["messageId", "subagentId", "intentId", "dispatchId", "observation"]) {
+    if (value[key] !== void 0 && typeof value[key] !== "string") return false;
+  }
+  return value.resolution === void 0 || isRecord(value.resolution) && typeof value.resolution.at === "string" && ["conclude", "release", "close", "recovered", "archived"].includes(value.resolution.action);
+}
 
 // src/client/BlackboardGraph.tsx
-var import_jsx_runtime = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 function BlackboardGraph({ view, selectedId, onSelect, t }) {
   const viewport = (0, import_react.useRef)(null);
   const [zoom, setZoom] = (0, import_react.useState)(1);
@@ -351,20 +391,20 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
   const scale = zoom ?? Math.min(1, Math.max(0.2, availableWidth / view.width));
   const byId = new Map(view.nodes.map((node) => [node.id, node]));
   const cardByIntent = new Map(view.intents.map((stub) => [stub.intentId, stub]));
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-graph", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-toolbar", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t("canvas.hint") }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-zoom", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": t("canvas.zoomOut"), disabled: scale <= 0.2, onClick: () => setZoom(Math.max(0.2, scale - 0.15)), children: "\u2212" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", "aria-label": t("canvas.actualSize"), onClick: () => setZoom(1), children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-graph", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-toolbar", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("canvas.hint") }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-zoom", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-label": t("canvas.zoomOut"), disabled: scale <= 0.2, onClick: () => setZoom(Math.max(0.2, scale - 0.15)), children: "\u2212" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", "aria-label": t("canvas.actualSize"), onClick: () => setZoom(1), children: [
           Math.round(scale * 100),
           "%"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": t("canvas.zoomIn"), disabled: scale >= 2, onClick: () => setZoom(Math.min(2, scale + 0.15)), children: "+" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", onClick: () => setZoom(null), children: t("canvas.fit") })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-label": t("canvas.zoomIn"), disabled: scale >= 2, onClick: () => setZoom(Math.min(2, scale + 0.15)), children: "+" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", onClick: () => setZoom(null), children: t("canvas.fit") })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-bb-canvas", ref: viewport, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-bb-canvas", ref: viewport, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
       "svg",
       {
         width: view.width * scale,
@@ -373,7 +413,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
         role: "group",
         "aria-label": view.title,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M 1 1 L 9 5 L 1 9", fill: "none", stroke: "context-stroke", strokeWidth: "1.5" }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("marker", { id: markerId, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M 1 1 L 9 5 L 1 9", fill: "none", stroke: "context-stroke", strokeWidth: "1.5" }) }) }),
           view.edges.flatMap((edge) => {
             const intent = cardByIntent.get(edge.id);
             if (intent === void 0) return [];
@@ -384,7 +424,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
             });
             const output = edge.to === null ? void 0 : byId.get(edge.to);
             return [
-              ...segments.map(({ key, source, dest, kind }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              ...segments.map(({ key, source, dest, kind }) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "path",
                 {
                   className: "dsh-bb-edge",
@@ -396,7 +436,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
                 },
                 `${edge.id}:${key}`
               )),
-              output && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              output && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
                 "path",
                 {
                   className: "dsh-bb-edge",
@@ -410,7 +450,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
               )
             ];
           }),
-          view.nodes.map((node) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          view.nodes.map((node) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             NodeCard,
             {
               node,
@@ -420,7 +460,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
             },
             node.id
           )),
-          view.intents.map((stub) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          view.intents.map((stub) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             IntentCard,
             {
               stub,
@@ -442,7 +482,7 @@ function NodeCard({
   kicker,
   onSelect
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "g",
     {
       className: "dsh-bb-node",
@@ -464,8 +504,8 @@ function NodeCard({
         onSelect(node.id);
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("title", { children: `${kicker} ${node.id}: ${node.description}` }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("title", { children: `${kicker} ${node.id}: ${node.description}` }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "rect",
           {
             className: "dsh-bb-node-card",
@@ -474,7 +514,7 @@ function NodeCard({
             rx: 12
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardContent, { width: node.width, height: node.height, kicker, id: node.id, description: node.description })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(CardContent, { width: node.width, height: node.height, kicker, id: node.id, description: node.description })
       ]
     }
   );
@@ -486,7 +526,7 @@ function IntentCard({
   kicker,
   statusLabel
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
     "g",
     {
       className: "dsh-bb-node dsh-bb-intent",
@@ -509,8 +549,8 @@ function IntentCard({
         onSelect(stub.id);
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("title", { children: stub.description }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("title", { children: stub.description }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "rect",
           {
             className: "dsh-bb-node-card",
@@ -519,7 +559,7 @@ function IntentCard({
             rx: 12
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardContent, { width: stub.width, height: stub.height, kicker, id: stub.intentId, description: stub.description, statusLabel })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(CardContent, { width: stub.width, height: stub.height, kicker, id: stub.intentId, description: stub.description, statusLabel })
       ]
     }
   );
@@ -549,18 +589,18 @@ function describeEdge(edge) {
   return lines.join("\n");
 }
 function CardContent({ width, height, kicker, id, description, statusLabel }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("foreignObject", { width, height, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-card-content", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-bb-card-heading", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: kicker }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: id })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("foreignObject", { width, height, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-card-content", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-card-heading", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: kicker }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("code", { children: id })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-bb-card-description", children: description }),
-    statusLabel && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "dsh-bb-intent-status", children: statusLabel })
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-bb-card-description", children: description }),
+    statusLabel && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-intent-status", children: statusLabel })
   ] }) });
 }
 
 // src/client/BlackboardSidebarPanel.tsx
-var import_jsx_runtime2 = require("react/jsx-runtime");
+var import_jsx_runtime3 = require("react/jsx-runtime");
 var PANEL_GAP = 8;
 var POLL_MS = 1500;
 function BlackboardSidebarPanel({
@@ -633,8 +673,8 @@ function BlackboardSidebarPanel({
   const statusKey = view === void 0 ? "status.active" : `status.${view.status}`;
   const statusLabel = t(statusKey);
   const detail = view === void 0 ? void 0 : selectedDetail(view, selectedId);
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { ref: rootRef, className: wide ? "dsh-bb-layer" : "dsh-bb-layer dsh-bb-rail", children: [
-    open && anchor !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { ref: rootRef, className: wide ? "dsh-bb-layer" : "dsh-bb-layer dsh-bb-rail", children: [
+    open && anchor !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "section",
       {
         className: "dsh-bb-panel",
@@ -643,23 +683,23 @@ function BlackboardSidebarPanel({
         "data-blackboard-owner": ownerId,
         "aria-label": t("panel.title"),
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("header", { className: "dsh-bb-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-title-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-title", children: view?.title ?? t("panel.title") }),
-              view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-status", children: statusLabel })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("header", { className: "dsh-bb-header", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-title-row", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-title", children: view?.title ?? t("panel.title") }),
+              view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-status", children: statusLabel })
             ] }),
-            ownerTitle !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-bb-owner", children: t("panel.owner", { title: ownerTitle }) }),
-            view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-meta", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("meta.facts", { count: view.factCount }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("meta.open", { count: view.openCount }) }),
-              view.reason !== null && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: t("meta.reasoning", { worker: view.reason.worker }) })
+            ownerTitle !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "dsh-bb-owner", children: t("panel.owner", { title: ownerTitle }) }),
+            view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-meta", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: t("meta.facts", { count: view.factCount }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: t("meta.open", { count: view.openCount }) }),
+              view.reason !== null && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: t("meta.reasoning", { worker: view.reason.worker }) })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "dsh-bb-body", children: panelBody({ current, snapshot, view, selectedId, setSelectedId, t, detail }) })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "dsh-bb-body", children: panelBody({ current, snapshot, view, selectedId, setSelectedId, t, detail }) })
         ]
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.Tooltip, { label: t("panel.trigger"), delayMs: 500, disabled: wide, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_dsh_client_ui_primitives.Tooltip, { label: t("panel.trigger"), delayMs: 500, disabled: wide, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "button",
       {
         type: "button",
@@ -672,12 +712,12 @@ function BlackboardSidebarPanel({
           setOpen((value) => !value);
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(BlackboardIcon, { size: wide ? 16 : 18 }),
-          wide && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-trigger-label", children: t("panel.trigger") }),
-            view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-trigger-meta", children: view.factCount })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(BlackboardIcon, { size: wide ? 16 : 18 }),
+          wide && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-trigger-label", children: t("panel.trigger") }),
+            view !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-trigger-meta", children: view.factCount })
           ] }),
-          !wide && view !== void 0 && view.openCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-rail-dot", "aria-hidden": "true" })
+          !wide && view !== void 0 && view.openCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-rail-dot", "aria-hidden": "true" })
         ]
       }
     ) })
@@ -692,56 +732,66 @@ function panelBody({
   t,
   detail
 }) {
-  if (current === void 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.noSession") });
-  if (snapshot === void 0) return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.loading") });
-  if (snapshot.kind === "missing") return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-note", children: t("panel.empty") });
+  if (current === void 0) return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-note", children: t("panel.noSession") });
+  if (snapshot === void 0) return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-note", children: t("panel.loading") });
+  if (snapshot.kind === "missing") return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-note", children: t("panel.empty") });
   if (snapshot.kind === "invalid") {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-error", role: "alert", children: t("panel.invalid", { message: snapshot.message }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-error", role: "alert", children: t("panel.invalid", { message: snapshot.message }) });
   }
   if (snapshot.kind === "error") {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-error", role: "alert", children: t("panel.load.error", { message: snapshot.message }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-error", role: "alert", children: t("panel.load.error", { message: snapshot.message }) });
   }
   if (view === void 0) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(BlackboardGraph, { view, selectedId, onSelect: setSelectedId, t }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-legend", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch origin" }),
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(BlackboardGraph, { view, selectedId, onSelect: setSelectedId, t }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-legend", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-swatch origin" }),
         t("legend.origin")
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-swatch" }),
         t("legend.fact")
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch goal" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-swatch goal" }),
         t("legend.goal")
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "dsh-bb-swatch intent" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "dsh-bb-swatch intent" }),
         t("kind.intent")
       ] })
     ] }),
-    detail !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-detail", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-detail-kicker", children: detail.kicker }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-detail-body", children: detail.body })
+    detail !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-detail", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-detail-kicker", children: detail.kicker }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-detail-body", children: detail.body })
     ] }),
-    view.hints.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "dsh-bb-hints", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-hints-title", children: t("detail.hint") }),
-      view.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "dsh-bb-hint", children: hint.content }, hint.id))
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(WorkerReturns, { view, selectedId, t }),
+    view.hints.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-hints", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-hints-title", children: t("detail.hint") }),
+      view.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-hint", children: hint.content }, hint.id))
     ] })
   ] });
 }
 function BlackboardIcon({ size }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("rect", { x: "1.5", y: "2.5", width: "13", height: "11", rx: "2", stroke: "currentColor", strokeWidth: "1.25" }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("path", { d: "M4 6.5h8M4 9.5h5", stroke: "currentColor", strokeWidth: "1.25", strokeLinecap: "round" })
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "1.5", y: "2.5", width: "13", height: "11", rx: "2", stroke: "currentColor", strokeWidth: "1.25" }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M4 6.5h8M4 9.5h5", stroke: "currentColor", strokeWidth: "1.25", strokeLinecap: "round" })
   ] });
 }
 
 // src/client/locales.ts
 var NS = "blackboard";
 var zh = {
+  "intent.invalidated": "\u5386\u53F2\u5B8C\u6210\uFF08\u5DF2\u5931\u6548\uFF09",
+  "returns.title": "\u5B50\u4EE3\u7406\u8FD4\u56DE",
+  "returns.unlinked": "\u672A\u5173\u8054\u4EFB\u52A1",
+  "returns.pending": "\u5F85\u5BA1\u6838",
+  "returns.conclude": "\u5DF2\u8BB0\u5F55\u4E8B\u5B9E",
+  "returns.release": "\u5DF2\u91CA\u653E",
+  "returns.close": "\u5DF2\u5173\u95ED",
+  "returns.recovered": "\u5F02\u5E38\u5DF2\u89E3\u9664\u6216\u66F4\u65B0",
+  "returns.archived": "\u5DF2\u7559\u6863",
   "canvas.hint": "\u70B9\u51FB\u8282\u70B9\u67E5\u770B\u5B8C\u6574\u5185\u5BB9",
   "canvas.zoomOut": "\u7F29\u5C0F",
   "canvas.zoomIn": "\u653E\u5927",
@@ -785,6 +835,15 @@ var zh = {
   "kind.fact": "\u4E8B\u5B9E"
 };
 var en = {
+  "intent.invalidated": "Historical completion (invalidated)",
+  "returns.title": "Worker returns",
+  "returns.unlinked": "Unlinked",
+  "returns.pending": "Needs review",
+  "returns.conclude": "Fact recorded",
+  "returns.release": "Released",
+  "returns.close": "Closed",
+  "returns.recovered": "Observation cleared or updated",
+  "returns.archived": "Archived",
   "canvas.hint": "Select a node to see details",
   "canvas.zoomOut": "Zoom out",
   "canvas.zoomIn": "Zoom in",
@@ -1141,6 +1200,12 @@ var CSS = `
   white-space: pre-wrap;
   word-break: break-word;
 }
+.dsh-bb-returns { margin-top: 16px; }
+.dsh-bb-returns details { padding: 8px 0; }
+.dsh-bb-returns summary { cursor: pointer; overflow-wrap: anywhere; }
+.dsh-bb-returns pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.dsh-bb-edge[data-status="invalidated"] { opacity: .4; stroke-dasharray: 5 5; }
+.dsh-bb-intent[data-status="invalidated"] { opacity: .6; }
 .dsh-bb-hints {
   margin: 8px 4px 0;
 }

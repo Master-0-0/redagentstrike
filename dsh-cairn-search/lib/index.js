@@ -114,7 +114,7 @@ function snapshotCheckpoint(board) {
 function situationTrigger(board) {
   if (board.facts.length > board.checkpoint.factCount) return "new-fact";
   if (board.hints.length > board.checkpoint.hintCount) return "new-hint";
-  if (board.checkpoint.hadOpenIntents && openIntents(board).length === 0) return "intents-empty";
+  if ((board.pendingIntentsEmpty || board.checkpoint.hadOpenIntents) && openIntents(board).length === 0) return "intents-empty";
   return null;
 }
 function reasonTriggerForStart(board) {
@@ -220,7 +220,8 @@ function emptyBoard(title, origin, goal, hints) {
 async function loadBoard(cwd, ownerId) {
   try {
     const raw = await readFile(boardPath(cwd, ownerId), "utf8");
-    return JSON.parse(raw);
+    const board = JSON.parse(raw);
+    return { ...board, workerReturns: board.workerReturns ?? [] };
   } catch (err) {
     const error = err;
     if (error.code === "ENOENT") return null;
@@ -257,6 +258,8 @@ async function seedBoard(cwd, ownerId, sourceOwnerId) {
 }
 function nextTask(board) {
   if (board.status !== "active") return idle(board.status);
+  const pending = openIntents(board).filter((i) => i.pendingReturn);
+  if (pending.length) return { kind: "review", intents: pending, records: (board.workerReturns ?? []).filter((r) => !r.resolution && pending.some((i) => i.id === r.intentId && i.dispatchId === r.dispatchId)) };
   if (isInitial(board)) {
     if (board.bootstrapEnabled && !bootstrapInProgress(board)) {
       return {
@@ -294,7 +297,7 @@ function releaseIntent(board, intentId) {
   requireActive(board);
   const intent = requireIntent(board, intentId);
   if (intent.to !== null || intent.closed) throw new Error("already concluded or closed");
-  return replaceIntent(board, intentId, clearClaim(intent));
+  return resolveReturns(replaceIntent(board, intentId, clearClaim(intent)), intent, "release");
 }
 function concludeIntent(board, intentId, description, worker, supersedes = []) {
   requireActive(board);
@@ -312,16 +315,17 @@ function concludeIntent(board, intentId, description, worker, supersedes = []) {
   const fact = { id: nextFactId(board), description: trimmed, ...supersedes.length ? { supersedes: [...supersedes] } : {} };
   const concluded = {
     ...intent,
+    pendingReturn: false,
     to: fact.id,
     worker,
     concludedAt: nowIso()
   };
   return {
-    board: {
+    board: resolveReturns({
       ...board,
       facts: [...board.facts, fact],
       intents: board.intents.map((item) => item.id === intentId ? concluded : item)
-    },
+    }, intent, "conclude"),
     fact
   };
 }
@@ -343,6 +347,7 @@ function startReason(board, worker) {
     board: {
       ...board,
       reason: lease,
+      pendingIntentsEmpty: false,
       checkpoint: snapshotCheckpoint(board)
     },
     trigger
@@ -437,14 +442,25 @@ function stopBoard(board) {
     ...board,
     status: "stopped",
     reason: null,
+    workerReturns: (board.workerReturns ?? []).map((r) => r.resolution ? r : { ...r, resolution: { action: "archived", at: nowIso() } }),
     intents: board.intents.map(
       (intent) => intent.to === null ? clearClaim(intent) : intent
     )
   };
 }
-function reopenBoard(board) {
-  if (board.status === "completed") throw new Error("completed board cannot be reopened");
-  return { ...board, status: "active" };
+function reopenBoard(board, description) {
+  if (board.status === "active") return board;
+  if (board.status === "stopped") return { ...board, status: "active" };
+  if (!description?.trim()) throw new Error("completed board requires feedback description");
+  const completions = board.intents.filter((i) => i.to === GOAL_ID && !i.invalidated);
+  if (completions.length !== 1) throw new Error("expected one valid completion intent");
+  const added = addHint(board, description, "user.feedback");
+  return {
+    ...added.board,
+    status: "active",
+    reason: null,
+    intents: board.intents.map((i) => i.id === completions[0].id ? { ...i, invalidated: { at: nowIso(), hintId: added.hint.id } } : i)
+  };
 }
 function ensureBootstrapIntent(board) {
   if (!isInitial(board)) return board;
@@ -468,7 +484,7 @@ function closeIntent(board, intentId, reason) {
   if (intent.to !== null || intent.closed) throw new Error("already concluded or closed");
   if (!reason.trim()) throw new Error("empty close reason");
   const closed = replaceIntent(board, intentId, { ...clearClaim(intent), closed: { reason: reason.trim(), at: nowIso() } });
-  return addHint(closed, `${intentId} closed: ${reason.trim()}`, "dispatcher.close").board;
+  return resolveReturns({ ...closed, pendingIntentsEmpty: openIntents(closed).length === 0 || board.pendingIntentsEmpty }, intent, "close");
 }
 var transactions = /* @__PURE__ */ new Map();
 async function withBoardLock(cwd, ownerId, run) {
@@ -496,23 +512,66 @@ function bindDispatch(board, intentId, dispatchId, subagentId) {
   if (intent.dispatchId !== dispatchId || intent.closed || intent.to !== null || board.status !== "active") return board;
   return replaceIntent(board, intentId, { ...intent, subagentId });
 }
+function recordWorkerReturn(board, input) {
+  const records = board.workerReturns ?? [];
+  if (input.messageId && (board.hints.some((h) => h.messageId === input.messageId) || records.some((r) => r.messageId === input.messageId))) return board;
+  const intent = board.intents.find((i) => input.dispatchId ? i.dispatchId === input.dispatchId && (!input.intentId || i.id === input.intentId) : !!input.subagentId && i.subagentId === input.subagentId);
+  const active = board.status === "active" && intent && intent.to === null && !intent.closed;
+  const record = {
+    ...input,
+    id: nextNumericId("r", records.map((r) => r.id)),
+    createdAt: nowIso(),
+    ...intent ? { intentId: intent.id, dispatchId: intent.dispatchId } : {},
+    ...!active ? { resolution: { action: "archived", at: nowIso() } } : {}
+  };
+  return {
+    ...board,
+    workerReturns: [...records, record],
+    intents: board.intents.map((i) => active && i.id === intent.id ? { ...i, pendingReturn: true } : i)
+  };
+}
+function resolveReturns(board, intent, action) {
+  return { ...board, workerReturns: (board.workerReturns ?? []).map((r) => r.intentId === intent.id && r.dispatchId === intent.dispatchId && !r.resolution ? { ...r, resolution: { action, at: nowIso() } } : r) };
+}
+function observeWorker(board, intent, observation) {
+  const records = board.workerReturns ?? [];
+  const related = records.filter((r) => r.intentId === intent.id && r.dispatchId === intent.dispatchId && !r.resolution);
+  if (related.some((r) => r.kind === "return")) return board;
+  if (!observation && !related.some((r) => r.kind === "observation")) return board;
+  if (observation && related.some((r) => r.observation === observation)) return board;
+  const updated = {
+    ...board,
+    workerReturns: records.map((r) => related.includes(r) && r.kind === "observation" ? { ...r, resolution: { action: "recovered", at: nowIso() } } : r),
+    intents: board.intents.map((i) => i.id === intent.id ? { ...i, pendingReturn: false } : i)
+  };
+  return observation ? recordWorkerReturn(updated, {
+    kind: "observation",
+    content: observation,
+    observation,
+    intentId: intent.id,
+    dispatchId: intent.dispatchId,
+    subagentId: intent.subagentId
+  }) : updated;
+}
 
 // src/audit.ts
 function auditBoard(board) {
-  const warnings = [];
+  const warnings = board.workerStatusWarning ? [board.workerStatusWarning] : [];
   const superseded = new Set(board.facts.flatMap((f) => f.supersedes ?? []));
   const active = board.facts.filter((f) => f.id !== "goal" && !superseded.has(f.id));
   for (const intent of board.intents.filter((i) => !i.closed && i.to === null)) {
     if (!intent.target && intent.description !== "bootstrap") warnings.push(`${intent.id}: missing single subgoal target; do not use a queue as an intent`);
     if (active.length > 2 && active.every((f) => intent.from.includes(f.id))) warnings.push(`${intent.id}: depends on every current fact; select only direct premises`);
     if (intent.from.some((id) => superseded.has(id))) warnings.push(`${intent.id}: uses superseded facts; close and redeclare from current evidence`);
-    if (intent.pendingReturn) warnings.push(`${intent.id}: worker returned; conclude its finding, release for retry, or close`);
+    if (intent.pendingReturn) warnings.push(`${intent.id}: worker return or status observation needs review; inspect the actual outcome before concluding, releasing, or closing`);
   }
   if (board.status === "active" && board.facts.length > board.checkpoint.factCount) warnings.push("New facts await reason; checkpoint is the last reason-start snapshot, not a live count");
   return warnings;
 }
 
 // src/runtime.ts
+var inFlight = /* @__PURE__ */ new Set();
+var flightKey = (target, id) => `${target.cwd}/${target.ownerId}/${id}`;
 function installRuntime(ctx, targetOf) {
   ctx.on("tools/execute", async (exec, next) => {
     if (exec.name === "update_goal" && exec.agent?.session.header.origin !== "subagent") {
@@ -542,6 +601,7 @@ function installRuntime(ctx, targetOf) {
       const board = await loadBoard(target.cwd, target.ownerId);
       if (!board) throw new Error("initialize and claim blackboard intent before spawn");
       await saveBoard(target.cwd, target.ownerId, reserveDispatch(board, intentId, exec.callId));
+      inFlight.add(flightKey(target, exec.callId));
     });
     const failed = async () => withBoardLock(target.cwd, target.ownerId, async () => {
       const board = await loadBoard(target.cwd, target.ownerId);
@@ -568,12 +628,13 @@ function installRuntime(ctx, targetOf) {
         } else if (value?.kind === "foreground") {
           await withBoardLock(target.cwd, target.ownerId, async () => {
             const board = await loadBoard(target.cwd, target.ownerId);
-            if (board?.status === "active") {
-              await saveBoard(target.cwd, target.ownerId, {
-                ...board,
-                intents: board.intents.map((i) => i.id === intentId && i.dispatchId === exec.callId && i.to === null && !i.closed ? { ...i, pendingReturn: true } : i)
-              });
-            }
+            if (board) await saveBoard(target.cwd, target.ownerId, recordWorkerReturn(board, {
+              kind: "return",
+              content: JSON.stringify(result.value ?? result.content),
+              messageId: `foreground:${exec.callId}`,
+              intentId,
+              dispatchId: exec.callId
+            }));
           });
         }
       }
@@ -581,6 +642,8 @@ function installRuntime(ctx, targetOf) {
     } catch (error) {
       await failed();
       throw error;
+    } finally {
+      inFlight.delete(flightKey(target, exec.callId));
     }
   });
   ctx.on("agent/pre-step", async ({ agent, messages }, next) => {
@@ -597,15 +660,17 @@ function installRuntime(ctx, targetOf) {
         if (source.kind !== "user" && source.kind !== "subagent-settled") continue;
         const text = message.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
         if (!text) continue;
-        const added = addHint(board, text, source.kind === "user" ? "user" : "dispatcher.worker-return");
-        board = { ...added.board, hints: added.board.hints.map((h) => h.id === added.hint.id ? { ...h, messageId: message.id } : h) };
-        if (source.kind === "subagent-settled" && board.status === "active") {
-          board = { ...board, intents: board.intents.map((i) => i.subagentId === source.senderSessionId && i.to === null && !i.closed ? { ...i, pendingReturn: true } : i) };
+        if (source.kind === "user") {
+          const added = addHint(board, text, "user");
+          board = { ...added.board, hints: added.board.hints.map((h) => h.id === added.hint.id ? { ...h, messageId: message.id } : h) };
+        } else {
+          board = recordWorkerReturn(board, { kind: "return", content: text, messageId: message.id, subagentId: source.senderSessionId });
         }
         changed = true;
       }
       if (changed) await saveBoard(cwd, agent.session.id, board);
     });
+    await reconcileWorkers(ctx, { cwd, ownerId: agent.session.id });
     return next();
   });
 }
@@ -622,6 +687,52 @@ function interruptChild(ctx, agent, childId) {
   const runtime = ctx.get("subagents");
   if (!runtime) throw new Error("subagent runtime unavailable; cannot stop bound worker");
   runtime.interrupt(childId, { kind: "ancestor", agent });
+}
+async function reconcileWorkers(ctx, target) {
+  const snapshot = await loadBoard(target.cwd, target.ownerId);
+  if (!snapshot || snapshot.status !== "active") return [];
+  const candidates = snapshot.intents.filter((i) => i.dispatchId && i.to === null && !i.closed && !inFlight.has(flightKey(target, i.dispatchId)));
+  if (!candidates.length) {
+    if (snapshot.workerStatusWarning) await withBoardLock(target.cwd, target.ownerId, async () => {
+      const board = await loadBoard(target.cwd, target.ownerId);
+      if (board && !board.intents.some((i) => i.dispatchId && i.to === null && !i.closed)) {
+        const { workerStatusWarning, ...rest } = board;
+        await saveBoard(target.cwd, target.ownerId, rest);
+      }
+    });
+    return [];
+  }
+  let rows;
+  try {
+    const runtime = ctx.get("subagents");
+    if (!runtime) throw new Error("subagent runtime unavailable");
+    rows = await runtime.listChildren(target.ownerId);
+  } catch (error) {
+    const warning = `Worker status query unavailable; claims retained: ${error instanceof Error ? error.message : String(error)}`;
+    await withBoardLock(target.cwd, target.ownerId, async () => {
+      const board = await loadBoard(target.cwd, target.ownerId);
+      if (board?.status === "active" && board.workerStatusWarning !== warning) await saveBoard(target.cwd, target.ownerId, { ...board, workerStatusWarning: warning });
+    });
+    return [warning];
+  }
+  await withBoardLock(target.cwd, target.ownerId, async () => {
+    let board = await loadBoard(target.cwd, target.ownerId);
+    if (!board || board.status !== "active") return;
+    const before = board;
+    if (board.workerStatusWarning) {
+      const { workerStatusWarning, ...rest } = board;
+      board = rest;
+    }
+    for (const candidate of candidates) {
+      const intent = board.intents.find((i) => i.id === candidate.id && i.dispatchId === candidate.dispatchId && i.to === null && !i.closed);
+      if (!intent || inFlight.has(flightKey(target, intent.dispatchId))) continue;
+      const row = rows.find((r) => r.id === intent.subagentId);
+      const observation = !intent.subagentId ? "Dispatch has no bound child; verify the original spawn before retrying." : !row ? "Bound child is absent from the catalog; outcome is unknown." : row.kind === "diagnostic" ? `Child status diagnostic: ${row.reason}; outcome is unknown.` : row.activity === "inactive" ? "Child is inactive without a recorded return; inspect its result before deciding." : void 0;
+      board = observeWorker(board, intent, observation);
+    }
+    if (board !== before) await saveBoard(target.cwd, target.ownerId, board);
+  });
+  return [];
 }
 
 // src/index.ts
@@ -641,7 +752,7 @@ var OPS = [
   "stop",
   "reopen"
 ];
-var DESCRIPTION = "Read and update the origin\u2192goal fact-intent blackboard at .dsh/blackboards/<main-session-id>.json. This tool is the only writer of that file. Subagent sessions share the main session's board; a forked conversation gets its own copy of the source snapshot. Call op=init once per main session (title, origin, goal, optional hints), then op=next to learn the next task (bootstrap, reason, explore, or idle). Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. Use op=close with intentId and description to abandon or replace work without a fact. Use one target per intent and minimal direct from dependencies. Spawn prompts must begin with blackboard_intent: iNNN after claim. Record one distilled conclusion, including negative findings; use supersedes for corrections. Every mutation returns next; execute it before starting more exploration. Complete requires observed facts and no open intents. Do not hand-edit the board file. Policy refusals are not facts.";
+var DESCRIPTION = "Read and update the origin\u2192goal fact-intent blackboard at .dsh/blackboards/<main-session-id>.json. This tool is the only writer of that file. Subagent sessions share the main session's board; a forked conversation gets its own copy of the source snapshot. Call op=init once per main session (title, origin, goal, optional hints), then op=next to learn the next task (review, bootstrap, reason, explore, or idle). Claim an intent (op=claim) before exploring it; conclude with exactly one new fact (op=conclude) or release it (op=release). Reason with op=reason_start then op=reason_finish (exactly one of complete, intents, or {}). Human judgment is op=hint. op=stop freezes writes except hints; op=reopen resumes. Use op=close with intentId and description to abandon or replace work without a fact. Use one target per intent and minimal direct from dependencies. Spawn prompts must begin with blackboard_intent: iNNN after claim. Record one distilled conclusion, including negative findings; use supersedes for corrections. Review pending worker returns before other work; inspect unknown outcomes, then conclude, release or close. Returns are not hints or facts. Completed boards require feedback description to reopen; old completion stays as invalidated history. Every mutation returns next; execute it before starting more exploration. Complete requires observed facts and no open intents. Do not hand-edit the board file. Policy refusals are not facts.";
 var INTENT_DRAFT = {
   type: "object",
   additionalProperties: false,
@@ -682,9 +793,9 @@ function apply(ctx) {
         items: { type: "string" },
         description: "Optional starting hints (op=init)."
       },
-      intentId: { type: "string", description: "Intent id (op=claim, conclude, release)." },
+      intentId: { type: "string", description: "Intent id (op=claim, conclude, release, close)." },
       worker: { type: "string", description: "Worker label (op=claim, conclude, reason_start, reason_finish)." },
-      description: { type: "string", description: "Fact text (op=conclude)." },
+      description: { type: "string", description: "Fact text (conclude), closure reason (close), or required feedback when reopening a completed board (reopen)." },
       supersedes: { type: "array", items: { type: "string" }, description: "Prior fact IDs replaced by this conclusion; preserve their history." },
       content: { type: "string", description: "Hint text (op=hint)." },
       creator: { type: "string", description: "Hint author; defaults to user (op=hint)." },
@@ -734,6 +845,9 @@ function apply(ctx) {
     async execute(args, exec) {
       const target = boardTarget(ctx, exec);
       const { cwd, ownerId } = target;
+      if ((args.op === "snapshot" || args.op === "next") && exec.agent?.session.header.origin !== "subagent") {
+        await reconcileWorkers(ctx, target);
+      }
       const result = await withBoardLock(cwd, ownerId, async () => {
         if (exec.agent?.session.header.origin === "subagent" && args.op !== "snapshot" && args.op !== "next") {
           throw new Error("only the parent session may write the blackboard");
@@ -757,7 +871,7 @@ function apply(ctx) {
           }
           case "next": {
             const board = await requireBoard(target);
-            return { ok: true, op: args.op, next: nextTask(board) };
+            return { ok: true, op: args.op, next: nextTask(board), warnings: auditBoard(board) };
           }
           case "claim": {
             const intentId = required(args.intentId, "intentId");
@@ -823,7 +937,7 @@ function apply(ctx) {
             return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) };
           }
           case "reopen": {
-            const board = reopenBoard(await requireBoard(target));
+            const board = reopenBoard(await requireBoard(target), args.description);
             await saveBoard(cwd, ownerId, board);
             return { ok: true, op: args.op, board, warnings: auditBoard(board), next: nextTask(board) };
           }

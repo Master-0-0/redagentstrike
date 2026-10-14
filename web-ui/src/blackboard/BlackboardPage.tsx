@@ -1,3 +1,4 @@
+import { WorkerReturns } from '@cairn/client/WorkerReturns.tsx'
 import { ArchiveForm } from '../findings/ArchiveForm'
 import '../findings/findings.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -241,6 +242,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
                     {view.nodes.some(n => n.id === selectedId && n.kind === 'fact') && <button onClick={() => setArchiving(true)}>保存到漏洞成果库</button>}
                   </div>
                 )}
+                <WorkerReturns view={view} selectedId={selectedId} t={t} />
                 {view.hints.length > 0 && (
                   <div className="dsh-bb-hints">
                     <p className="dsh-bb-hints-title">{t('detail.hint')}</p>

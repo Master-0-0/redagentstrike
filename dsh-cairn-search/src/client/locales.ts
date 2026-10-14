@@ -3,6 +3,16 @@
 export const NS = 'blackboard'
 
 export const zh = {
+  'intent.invalidated': '历史完成（已失效）',
+  'returns.title': '子代理返回',
+  'returns.unlinked': '未关联任务',
+  'returns.pending': '待审核',
+  'returns.conclude': '已记录事实',
+  'returns.release': '已释放',
+  'returns.close': '已关闭',
+  'returns.recovered': '异常已解除或更新',
+  'returns.archived': '已留档',
+
   'canvas.hint': '点击节点查看完整内容',
   'canvas.zoomOut': '缩小',
   'canvas.zoomIn': '放大',
@@ -47,6 +57,16 @@ export const zh = {
 } as const
 
 export const en: Record<BlackboardKey, string> = {
+  'intent.invalidated': 'Historical completion (invalidated)',
+  'returns.title': 'Worker returns',
+  'returns.unlinked': 'Unlinked',
+  'returns.pending': 'Needs review',
+  'returns.conclude': 'Fact recorded',
+  'returns.release': 'Released',
+  'returns.close': 'Closed',
+  'returns.recovered': 'Observation cleared or updated',
+  'returns.archived': 'Archived',
+
   'canvas.hint': 'Select a node to see details',
   'canvas.zoomOut': 'Zoom out',
   'canvas.zoomIn': 'Zoom in',

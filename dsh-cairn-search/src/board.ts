@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import type { Board, Checkpoint, Fact, Hint, Intent, NextTask, ReasonLease } from './types.ts'
+import type { Board, Checkpoint, Fact, Hint, Intent, NextTask, ReasonLease, WorkerReturn } from './types.ts'
 import {
   BOOTSTRAP_DESCRIPTION,
   GOAL_ID,
@@ -76,7 +76,7 @@ function snapshotCheckpoint(board: Board): Checkpoint {
 function situationTrigger(board: Board): Exclude<ReasonLease['trigger'], 'initial'> | null {
   if (board.facts.length > board.checkpoint.factCount) return 'new-fact'
   if (board.hints.length > board.checkpoint.hintCount) return 'new-hint'
-  if (board.checkpoint.hadOpenIntents && openIntents(board).length === 0) return 'intents-empty'
+  if ((board.pendingIntentsEmpty || board.checkpoint.hadOpenIntents) && openIntents(board).length === 0) return 'intents-empty'
   return null
 }
 
@@ -197,7 +197,8 @@ export function emptyBoard(title: string, origin: string, goal: string, hints?: 
 export async function loadBoard(cwd: string, ownerId: string): Promise<Board | null> {
   try {
     const raw = await readFile(boardPath(cwd, ownerId), 'utf8')
-    return JSON.parse(raw) as Board
+    const board = JSON.parse(raw) as Board
+    return { ...board, workerReturns: board.workerReturns ?? [] }
   } catch (err) {
     const error = err as NodeJS.ErrnoException
     if (error.code === 'ENOENT') return null
@@ -259,6 +260,9 @@ export async function seedBoard(
 export function nextTask(board: Board): NextTask {
   if (board.status !== 'active') return idle(board.status)
 
+  const pending = openIntents(board).filter(i => i.pendingReturn)
+  if (pending.length) return { kind: 'review', intents: pending, records: (board.workerReturns ?? []).filter(r => !r.resolution && pending.some(i => i.id === r.intentId && i.dispatchId === r.dispatchId)) }
+
   if (isInitial(board)) {
     if (board.bootstrapEnabled && !bootstrapInProgress(board)) {
       return {
@@ -301,7 +305,7 @@ export function releaseIntent(board: Board, intentId: string): Board {
   requireActive(board)
   const intent = requireIntent(board, intentId)
   if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
-  return replaceIntent(board, intentId, clearClaim(intent))
+  return resolveReturns(replaceIntent(board, intentId, clearClaim(intent)), intent, 'release')
 }
 
 export function concludeIntent(
@@ -326,16 +330,17 @@ export function concludeIntent(
   const fact: Fact = { id: nextFactId(board), description: trimmed, ...(supersedes.length ? { supersedes: [...supersedes] } : {}) }
   const concluded: Intent = {
     ...intent,
+    pendingReturn: false,
     to: fact.id,
     worker,
     concludedAt: nowIso(),
   }
   return {
-    board: {
+    board: resolveReturns({
       ...board,
       facts: [...board.facts, fact],
       intents: board.intents.map((item) => (item.id === intentId ? concluded : item)),
-    },
+    }, intent, 'conclude'),
     fact,
   }
 }
@@ -361,6 +366,7 @@ export function startReason(
     board: {
       ...board,
       reason: lease,
+      pendingIntentsEmpty: false,
       checkpoint: snapshotCheckpoint(board),
     },
     trigger,
@@ -467,15 +473,22 @@ export function stopBoard(board: Board): Board {
     ...board,
     status: 'stopped',
     reason: null,
+    workerReturns: (board.workerReturns ?? []).map(r => r.resolution ? r : { ...r, resolution: { action: 'archived', at: nowIso() } }),
     intents: board.intents.map((intent) =>
       intent.to === null ? clearClaim(intent) : intent,
     ),
   }
 }
 
-export function reopenBoard(board: Board): Board {
-  if (board.status === 'completed') throw new Error('completed board cannot be reopened')
-  return { ...board, status: 'active' }
+export function reopenBoard(board: Board, description?: string): Board {
+  if (board.status === 'active') return board
+  if (board.status === 'stopped') return { ...board, status: 'active' }
+  if (!description?.trim()) throw new Error('completed board requires feedback description')
+  const completions = board.intents.filter(i => i.to === GOAL_ID && !i.invalidated)
+  if (completions.length !== 1) throw new Error('expected one valid completion intent')
+  const added = addHint(board, description, 'user.feedback')
+  return { ...added.board, status: 'active', reason: null,
+    intents: board.intents.map(i => i.id === completions[0].id ? { ...i, invalidated: { at: nowIso(), hintId: added.hint.id } } : i) }
 }
 
 export function ensureBootstrapIntent(board: Board): Board {
@@ -502,7 +515,7 @@ export function closeIntent(board: Board, intentId: string, reason: string): Boa
   if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
   if (!reason.trim()) throw new Error('empty close reason')
   const closed = replaceIntent(board, intentId, { ...clearClaim(intent), closed: { reason: reason.trim(), at: nowIso() } })
-  return addHint(closed, `${intentId} closed: ${reason.trim()}`, 'dispatcher.close').board
+  return resolveReturns({ ...closed, pendingIntentsEmpty: openIntents(closed).length === 0 || board.pendingIntentsEmpty }, intent, 'close')
 }
 
 /** Serialize read-modify-write, including different plugin instances sharing an owner. */
@@ -532,4 +545,39 @@ export function bindDispatch(board: Board, intentId: string, dispatchId: string,
   const intent = requireIntent(board, intentId)
   if (intent.dispatchId !== dispatchId || intent.closed || intent.to !== null || board.status !== 'active') return board
   return replaceIntent(board, intentId, { ...intent, subagentId })
+}
+
+/** Keep raw returns independently of human hints, including late and unlinked messages. */
+export function recordWorkerReturn(board: Board, input: Omit<WorkerReturn, 'id' | 'createdAt' | 'resolution'>): Board {
+  const records = board.workerReturns ?? []
+  if (input.messageId && (board.hints.some(h => h.messageId === input.messageId) || records.some(r => r.messageId === input.messageId))) return board
+  const intent = board.intents.find(i => input.dispatchId
+    ? i.dispatchId === input.dispatchId && (!input.intentId || i.id === input.intentId)
+    : !!input.subagentId && i.subagentId === input.subagentId)
+  const active = board.status === 'active' && intent && intent.to === null && !intent.closed
+  const record: WorkerReturn = { ...input, id: nextNumericId('r', records.map(r => r.id)), createdAt: nowIso(),
+    ...(intent ? { intentId: intent.id, dispatchId: intent.dispatchId } : {}),
+    ...(!active ? { resolution: { action: 'archived' as const, at: nowIso() } } : {}) }
+  return { ...board, workerReturns: [...records, record],
+    intents: board.intents.map(i => active && i.id === intent.id ? { ...i, pendingReturn: true } : i) }
+}
+
+function resolveReturns(board: Board, intent: Intent, action: 'conclude' | 'release' | 'close'): Board {
+  return { ...board, workerReturns: (board.workerReturns ?? []).map(r =>
+    r.intentId === intent.id && r.dispatchId === intent.dispatchId && !r.resolution
+      ? { ...r, resolution: { action, at: nowIso() } } : r) }
+}
+
+/** Replace a current observation without accumulating identical polling messages. */
+export function observeWorker(board: Board, intent: Intent, observation?: string): Board {
+  const records = board.workerReturns ?? []
+  const related = records.filter(r => r.intentId === intent.id && r.dispatchId === intent.dispatchId && !r.resolution)
+  if (related.some(r => r.kind === 'return')) return board
+  if (!observation && !related.some(r => r.kind === 'observation')) return board
+  if (observation && related.some(r => r.observation === observation)) return board
+  const updated = { ...board, workerReturns: records.map(r => related.includes(r) && r.kind === 'observation'
+    ? { ...r, resolution: { action: 'recovered' as const, at: nowIso() } } : r),
+    intents: board.intents.map(i => i.id === intent.id ? { ...i, pendingReturn: false } : i) }
+  return observation ? recordWorkerReturn(updated, { kind: 'observation', content: observation, observation,
+    intentId: intent.id, dispatchId: intent.dispatchId, subagentId: intent.subagentId }) : updated
 }
