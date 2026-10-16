@@ -1,22 +1,49 @@
 /** Runtime boundaries: spawn admission and durable parent inbox reconciliation. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
-import { addHint, bindDispatch, loadBoard, releaseIntent, reserveDispatch, saveBoard, withBoardLock, stopBoard, recordWorkerReturn, observeWorker } from './board.ts'
+import { addHint, bindDispatch, loadBoard, releaseIntent, reserveDispatch, saveBoard, withBoardLock, stopBoard, reopenBoard, recordWorkerReturn, observeWorker } from './board.ts'
 
 import type { Board } from './types.ts'
+import { completionEvidenceIssues } from './audit.ts'
 
 const inFlight = new Set<string>()
 const flightKey = (target: Target, id: string) => `${target.cwd}/${target.ownerId}/${id}`
+const dispatchTools = new Set(['subagent', 'subagent_fork', 'subagent_codex', 'subagent_claude_code'])
+// This listener is installed only in the Cairn preset. Keep execution tools in
+// that preset so explorers inherit them, but enforce the coordinator's role.
+const coordinatorTools = new Set(['blackboard', 'skill', 'read', 'read_image', 'ask_user_question',
+  'archive_finding', 'query_intel_lib', 'get_goal', 'create_goal', 'update_goal', 'list_agents', 'interrupt_agent', 'todo_write'])
 
 interface Target { cwd: string; ownerId: string }
 export function installRuntime(ctx: Context, targetOf: (exec: ToolExecution) => Target): void {
   ctx.on('tools/execute', async (exec, next) => {
+    const child = exec.agent?.session.header.origin === 'subagent'
+    if (exec.name === 'workflow' || exec.name === 'ralph') throw new Error('Cairn exploration must use claimed blackboard intents and subagent dispatch')
+    if (child && exec.name === 'skill' && (exec.arguments as { name?: string }).name === 'state-space-search') {
+      throw new Error('state-space-search is the coordinator skill; load cairn-explorer and the assigned execution skills')
+    }
+    if (!child && !coordinatorTools.has(exec.name) && !dispatchTools.has(exec.name)) {
+      throw new Error('Cairn parent coordinates and reviews evidence; delegate execution through a claimed intent')
+    }
+    if (!child && (exec.name === 'read' || exec.name === 'read_image')) {
+      const target = targetOf(exec)
+      const board = await loadBoard(target.cwd, target.ownerId)
+      if (!board?.workerReturns?.some(r => r.kind === 'return') && !board?.facts.some(f => f.id !== 'origin' && f.id !== 'goal')) {
+        throw new Error('Bootstrap only initializes and delegates; parent file reads are for reviewing returned evidence. Assign investigation to an explorer first.')
+      }
+    }
     if (exec.name === 'update_goal' && exec.agent?.session.header.origin !== 'subagent') {
       const target = targetOf(exec)
       const args = exec.arguments as { action?: string }
       const board = await loadBoard(target.cwd, target.ownerId)
-      if (board && args.action === 'complete' && board.status !== 'completed') throw new Error('prove blackboard goal before completing the session goal')
+      if (args.action === 'complete' && (!board || completionEvidenceIssues(board).length)) throw new Error('prove blackboard goal with current evidence before completing the session goal')
       const result = await next()
+      if (!result.isError && args.action === 'resume') {
+        await withBoardLock(target.cwd, target.ownerId, async () => {
+          const current = await loadBoard(target.cwd, target.ownerId)
+          if (current?.status === 'stopped') await saveBoard(target.cwd, target.ownerId, reopenBoard(current))
+        })
+      }
       if (!result.isError && (args.action === 'pause' || args.action === 'blocked')) {
         await withBoardLock(target.cwd, target.ownerId, async () => {
           const current = await loadBoard(target.cwd, target.ownerId)
@@ -28,7 +55,7 @@ export function installRuntime(ctx: Context, targetOf: (exec: ToolExecution) => 
       }
       return result
     }
-    if (!['subagent', 'subagent_fork', 'subagent_codex', 'subagent_claude_code'].includes(exec.name)) return next()
+    if (!dispatchTools.has(exec.name)) return next()
     const target = targetOf(exec)
     if (exec.agent?.session.header.origin === 'subagent') throw new Error('only the blackboard parent may dispatch explorers')
     const args = exec.arguments as { prompt?: string }
@@ -39,6 +66,8 @@ export function installRuntime(ctx: Context, targetOf: (exec: ToolExecution) => 
       if (!board) throw new Error('initialize and claim blackboard intent before spawn')
       await saveBoard(target.cwd, target.ownerId, reserveDispatch(board, intentId, exec.callId))
       inFlight.add(flightKey(target, exec.callId))
+      const intent = board.intents.find(i => i.id === intentId)!
+      exec.arguments = { ...args, prompt: `${args.prompt ?? ''}` + `\n\nCairn execution contract: Load cairn-explorer first. Load each assigned skill before acting: ${JSON.stringify(intent.skills ?? [])}. You are an explorer, not the coordinator. Execute only this intent: ${intent.description}. Return one objective JSON finding with evidence paths. Do not initialize or write the blackboard or dispatch agents.\nDirect premises: ${JSON.stringify(board.facts.filter(f => intent.from.includes(f.id)))}` }
     })
     const failed = async () => withBoardLock(target.cwd, target.ownerId, async () => {
       const board = await loadBoard(target.cwd, target.ownerId)

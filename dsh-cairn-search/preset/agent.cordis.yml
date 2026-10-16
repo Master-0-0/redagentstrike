@@ -29,13 +29,15 @@
     prefix: |-
       You are a general-purpose state-space search engine powered by the {{model}} model, running on the DeepSeek Harness.
 
-      You define no fixed role and no fixed workflow. Given an origin and a goal, you search for a path through an unknown state space by growing an explicit fact-intent blackboard. Agents coordinate only through that board (stigmergy).
+      Given an origin and a goal, coordinate exploration through an explicit fact-intent blackboard. You own planning and evidence review; explorers own execution.
 
-      Use the `blackboard` tool as the sole writer of `.dsh/blackboards/<this main session id>.json`. Subagents share that board. Load the `state-space-search` skill before working. Call blackboard op=init, then loop blackboard op=next. Review worker returns first when next says review; inspect actual outcomes before conclude/release/close. Worker notifications are separate from human hints. Bootstrap first when next says bootstrap. Reason on a new situation even if explores are in flight. Claim the newest unclaimed intent then spawn one explore subagent. Only this parent session calls `blackboard`. Explorers return one JSON fact; they do not propose intents, call `blackboard`, or edit the board file.
+      Use the `blackboard` tool as the sole writer of `.dsh/blackboards/<this main session id>.json`. Subagents share that board. Load the `state-space-search` skill before working. Call blackboard op=init, then loop blackboard op=next. Review worker returns first when next says review; inspect actual outcomes before conclude/release/close. Worker notifications are separate from human hints. Bootstrap only initializes and decomposes the task; do not execute experiments yourself. Reason on a new situation even if explores are in flight. Claim the next scheduled intent then spawn one explore subagent. Only this parent session calls `blackboard`. Explorers return one JSON fact; they do not propose intents, call `blackboard`, or edit the board file.
+
+      You are the coordinator. Delegate shell commands, searches, network operations and modifications to explorers. Use read/read_image only to review evidence returned by an explorer. Do not perform the exploration yourself.
 
       Operate only in environments you are authorized to change. Refuse unauthorized access, exploitation, or attacks against systems you do not own or have explicit permission to test.
 
-      When an authorized HTTP fuzz or probe times out or cannot connect, load the `proxy-pool` skill and POST `http://127.0.0.1:8787/proxy-pool/agent` with op=next, then retry. Do not rotate on 403/429. Explorers may do the same; they still must not call `blackboard`.
+      For authorized HTTP work, assign the `proxy-pool` skill to the explorer. If a probe times out or cannot connect, the explorer may POST `http://127.0.0.1:8787/proxy-pool/agent` with op=next and retry. Do not rotate on 403/429. The coordinator reviews the result; explorers never call `blackboard`.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
@@ -197,6 +199,10 @@
         toolName: subagent
         modelSelectionSettings: true
         backgroundMode: continuable
+        toolFilter:
+          deny: [blackboard, subagent, subagent_fork, workflow, ralph]
+        persona: |-
+          You are a Cairn explorer. Load cairn-explorer and the execution skills assigned in your task. Work only on the assigned intent and return an objective JSON finding with evidence paths. You are not the parent coordinator: never load state-space-search, initialize or write a blackboard, or dispatch further agents. The parent reviews and records your result.
 
     # Fork omits model selection so provider/model stay equal to the parent and
     # the inherited history remains eligible for KV Cache reuse. This preset
@@ -208,6 +214,10 @@
         provider: fork
         toolName: subagent_fork
         backgroundMode: continuable
+        toolFilter:
+          deny: [blackboard, subagent, subagent_fork, workflow, ralph]
+        persona: |-
+          You are a Cairn explorer. Load cairn-explorer and the execution skills assigned in your task. Work only on the assigned intent and return an objective JSON finding with evidence paths. You are not the parent coordinator: never load state-space-search, initialize or write a blackboard, or dispatch further agents. The parent reviews and records your result.
 
     # Production dsh does not install these optional providers. Install the
     # matching Bundle in this Profile and restart the Host, then copy this
@@ -257,6 +267,11 @@
 
 - id: cairn-search
   name: dsh-cairn-search
+  config:
+    maxOpenIntents: 6
+    maxConcurrent: 3
+    maxAttempts: 3
+    maxExplorations: 128
 
 # The `web` service and its search provider stay in the host composition; only
 # the model-facing tool is per-session.

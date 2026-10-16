@@ -1,6 +1,7 @@
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, writeFile, realpath } from 'node:fs/promises'
+import lockfile from 'proper-lockfile'
 import { dirname, join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import type { Board, Checkpoint, Fact, Hint, Intent, NextTask, ReasonLease, WorkerReturn } from './types.ts'
 import {
   BOOTSTRAP_DESCRIPTION,
@@ -9,6 +10,8 @@ import {
   ORIGIN_ID,
 } from './types.ts'
 import { nextNumericId } from './ids.ts'
+import { invalidFactIds } from './evidence.ts'
+import { readStoredBoard, serializeStoredBoard } from './storage.ts'
 import { boardRelativePath, LEGACY_BOARD_RELATIVE_PATH } from './owner.ts'
 
 const BOOTSTRAP_CREATOR = 'dispatcher.bootstrap'
@@ -96,14 +99,16 @@ function reasonTask(board: Board, trigger: ReasonLease['trigger']): NextTask {
 
 function unclaimedExplorable(board: Board): Intent[] {
   return board.intents.filter(
-    (intent) => intent.to === null && !intent.closed && intent.worker === null && !isReservedBootstrap(intent),
+    (intent) => intent.to === null && !intent.closed && (intent.worker === null || !intent.dispatchId) && !isReservedBootstrap(intent),
   )
 }
 
 function newestUnclaimed(board: Board): Intent | null {
   let newest: Intent | null = null
   for (const intent of unclaimedExplorable(board)) {
-    if (!newest || intent.createdAt >= newest.createdAt) newest = intent
+    if (!newest || (board.protocolVersion === 2
+      ? intent.createdAt < newest.createdAt || (intent.createdAt === newest.createdAt && (intent.attempts ?? 0) < (newest.attempts ?? 0))
+      : intent.createdAt >= newest.createdAt)) newest = intent
   }
   return newest
 }
@@ -138,7 +143,7 @@ function assertFrom(board: Board, from: readonly string[]): string[] {
     if (!ids.has(id)) throw new Error('unknown fact')
   }
   if (new Set(from).size !== from.length) throw new Error('duplicate from')
-  const superseded = new Set(board.facts.flatMap(f => f.supersedes ?? []))
+  const superseded = invalidFactIds(board)
   if (from.some(id => superseded.has(id))) throw new Error('superseded fact in from')
   return [...from]
 }
@@ -195,19 +200,40 @@ export function emptyBoard(title: string, origin: string, goal: string, hints?: 
 }
 
 export async function loadBoard(cwd: string, ownerId: string): Promise<Board | null> {
+  let raw: string
   try {
-    const raw = await readFile(boardPath(cwd, ownerId), 'utf8')
-    const board = JSON.parse(raw) as Board
-    return { ...board, workerReturns: board.workerReturns ?? [] }
+    raw = await readFile(boardPath(cwd, ownerId), 'utf8')
   } catch (err) {
     const error = err as NodeJS.ErrnoException
     if (error.code === 'ENOENT') return null
     throw err
   }
+  const board = await readStoredBoard(cwd, raw)
+  return { ...board, workerReturns: board.workerReturns ?? [] }
 }
 
 export async function saveBoard(cwd: string, ownerId: string, board: Board): Promise<void> {
-  await writeAtomic(boardPath(cwd, ownerId), JSON.stringify(board, null, 2))
+  const records = await Promise.all((board.workerReturns ?? []).map(async record => {
+    if (record.contentRef || record.content.length <= 2048) return record
+    const hash = createHash('sha256').update(record.content).digest('hex')
+    const contentRef = `.dsh/blackboard-content/${hash}.txt`
+    const path = join(cwd, contentRef)
+    // Publish content before its reference. A crash cannot leave a partial
+    // content file that a later retry mistakes for an existing complete blob.
+    await writeAtomic(path, record.content)
+    return { ...record, content: `${record.content.slice(0, 600)}\n[Full return available through lookup]`, contentRef, contentLength: record.content.length }
+  }))
+  await writeAtomic(boardPath(cwd, ownerId), await serializeStoredBoard(cwd, { ...board, workerReturns: records }))
+}
+
+/** Immutable content-addressed returns remain reachable across board forks. */
+export async function readReturnContent(cwd: string, record: WorkerReturn): Promise<string> {
+  if (!record.contentRef) return record.content
+  if (!/^\.dsh\/blackboard-content\/[a-f0-9]{64}\.txt$/.test(record.contentRef)) throw new Error('invalid return content reference')
+  const content = await readFile(join(cwd, record.contentRef), 'utf8')
+  const hash = createHash('sha256').update(content).digest('hex')
+  if (!record.contentRef.endsWith(`/${hash}.txt`)) throw new Error('archived worker return failed integrity check')
+  return content
 }
 
 /**
@@ -263,6 +289,8 @@ export function nextTask(board: Board): NextTask {
   const pending = openIntents(board).filter(i => i.pendingReturn)
   if (pending.length) return { kind: 'review', intents: pending, records: (board.workerReturns ?? []).filter(r => !r.resolution && pending.some(i => i.id === r.intentId && i.dispatchId === r.dispatchId)) }
 
+  if (board.reason !== null) return reasonTask(board, board.reason.trigger)
+
   if (isInitial(board)) {
     if (board.bootstrapEnabled && !bootstrapInProgress(board)) {
       return {
@@ -281,6 +309,7 @@ export function nextTask(board: Board): NextTask {
     if (trigger) return reasonTask(board, trigger)
   }
 
+  if (board.policy && openIntents(board).filter(i => i.dispatchId && !i.pendingReturn).length >= board.policy.maxConcurrent) return idle('workers running; await their returns')
   const intent = newestUnclaimed(board)
   if (intent) return { kind: 'explore', intent }
   return idle('no task')
@@ -305,7 +334,9 @@ export function releaseIntent(board: Board, intentId: string): Board {
   requireActive(board)
   const intent = requireIntent(board, intentId)
   if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
-  return resolveReturns(replaceIntent(board, intentId, clearClaim(intent)), intent, 'release')
+  const attempts = (intent.attempts ?? 0) + 1
+  if (board.policy && attempts >= board.policy.maxAttempts) return closeIntent(board, intentId, `Attempt budget exhausted (${attempts}); replan or request new evidence before retrying.`)
+  return resolveReturns(replaceIntent(board, intentId, { ...clearClaim(intent), attempts, createdAt: nowIso() }), intent, 'release')
 }
 
 export function concludeIntent(
@@ -321,6 +352,11 @@ export function concludeIntent(
   if (intent.to !== null || intent.closed) throw new Error('already concluded or closed')
   if (intent.worker === null) throw new Error('not claimed')
   if (intent.worker !== worker) throw new Error('not claimed')
+  // A correction may replace its old premise, but unrelated stale premises
+  // cannot support a new observation.
+  const invalid = invalidFactIds(board)
+  if (intent.from.some(id => invalid.has(id) && !supersedes.includes(id))) throw new Error('intent premises are no longer valid; close and redeclare')
+  if (board.protocolVersion === 2 && (!intent.dispatchId || !(board.workerReturns ?? []).some(r => r.intentId === intent.id && r.dispatchId === intent.dispatchId && r.kind === 'return' && !r.resolution))) throw new Error('review an actual dispatched worker return before concluding')
   const trimmed = description.trim()
   if (!trimmed) throw new Error('empty description')
   if (supersedes.length) {
@@ -358,6 +394,7 @@ export function startReason(
   const trigger = reasonTriggerForStart(board)
   if (!trigger) throw new Error('no reason trigger')
   const lease: ReasonLease = {
+    id: randomUUID(),
     worker,
     trigger,
     startedAt: nowIso(),
@@ -376,10 +413,12 @@ export function startReason(
 export function finishReason(
   board: Board,
   worker: string,
-  result: { complete?: { from: string[]; description: string }; intents?: { from: string[]; description: string; target?: string }[] },
+  result: { complete?: { from: string[]; description: string; proofs?: { criterionId: string; from: string[]; description: string }[] }; intents?: { from: string[]; description: string; target?: string; skills?: string[] }[] },
+  reasonId?: string,
 ): Board {
   requireWorker(worker)
   if (!board.reason || board.reason.worker !== worker) throw new Error('reason not held')
+  if (board.protocolVersion === 2 && (!reasonId || reasonId !== board.reason.id)) throw new Error('reasonId does not match the current reason; reload before submitting')
 
   const completing = result.complete !== undefined
   const declaring = result.intents !== undefined
@@ -388,6 +427,17 @@ export function finishReason(
 
   if (completing) {
     const complete = result.complete!
+    if (board.protocolVersion === 2) {
+      const criteria = board.criteria ?? []
+      const proofs = complete.proofs ?? []
+      if (!criteria.length || proofs.length !== criteria.length || new Set(proofs.map(p => p.criterionId)).size !== criteria.length) throw new Error('provide one evidence proof per acceptance criterion')
+      for (const criterion of criteria) {
+        const proof = proofs.find(p => p.criterionId === criterion.id)
+        if (!proof || !proof.description.trim() || !proof.from.some(id => id !== ORIGIN_ID)) throw new Error(`missing observed proof for ${criterion.id}`)
+        assertFrom(board, proof.from)
+        if (proof.from.some(id => !complete.from.includes(id))) throw new Error('criterion proof facts must be included in completion from')
+      }
+    }
     const from = assertFrom(board, complete.from)
     if (!from.some(id => id !== ORIGIN_ID)) throw new Error('completion requires observed facts')
     if (openIntents(board).length) throw new Error('close or conclude open intents before completion')
@@ -398,7 +448,7 @@ export function finishReason(
       id: nextIntentId(board),
       from,
       to: GOAL_ID,
-      description,
+      description: complete.proofs ? `${description}\n\nAcceptance proofs: ${JSON.stringify(complete.proofs)}` : description,
       creator: worker,
       worker,
       createdAt,
@@ -413,10 +463,17 @@ export function finishReason(
   }
 
   const incoming = (result.intents ?? []).slice(0, MAX_INTENTS)
+  // Only runtime-stamped user messages reset exploration. A coordinator can
+  // write hints (including a claimed author) but cannot mint messageId values.
+  const feedbackRevision = board.hints.filter(h => h.creator === 'user' && h.messageId).length
+  if (board.policy && incoming.length && board.intents.filter(i => i.feedbackRevision === feedbackRevision).length + incoming.length > board.policy.maxExplorations) {
+    throw new Error('exploration budget exhausted for this feedback revision; review progress and stop or request explicit feedback, do not continue generating directions')
+  }
   if (incoming.length === 0 && openIntents(board).length === 0) {
     throw new Error('intents required')
   }
 
+  if (board.policy && openIntents(board).length + incoming.length > board.policy.maxOpenIntents) throw new Error('open intent budget exceeded; resolve existing work first')
   const createdAt = nowIso()
   const declared: Intent[] = []
   for (const item of incoming) {
@@ -426,11 +483,13 @@ export function finishReason(
     const target = item.target?.trim()
     if (item.target !== undefined && !target) throw new Error('empty target')
     const peers = [...openIntents(board), ...declared]
+    if (board.protocolVersion === 2 && board.intents.some(i => (i.feedbackRevision ?? -1) === feedbackRevision && (i.target === target && !!target || i.description.trim() === description) && i.from.length === from.length && i.from.every(id => from.includes(id)))) throw new Error('direction already attempted with the same evidence; use new evidence or explicit feedback')
     if (peers.some(i => i.description.trim() === description || (target && i.target === target))) {
       throw new Error('overlapping open intent; conclude or close it first')
     }
     declared.push({
       ...(target ? { target } : {}),
+      ...(board.protocolVersion === 2 ? { feedbackRevision, skills: [...new Set(item.skills ?? [])] } : {}),
       id: nextIntentId({ ...board, intents: [...board.intents, ...declared] }),
       from,
       to: null,
@@ -521,9 +580,15 @@ export function closeIntent(board: Board, intentId: string, reason: string): Boa
 /** Serialize read-modify-write, including different plugin instances sharing an owner. */
 const transactions = new Map<string, Promise<unknown>>()
 export async function withBoardLock<T>(cwd: string, ownerId: string, run: () => Promise<T>): Promise<T> {
-  const key = boardPath(cwd, ownerId)
+  const key = boardPath(await realpath(cwd), ownerId)
   const prior = transactions.get(key) ?? Promise.resolve()
-  const current = prior.catch(() => undefined).then(run)
+  const current = prior.catch(() => undefined).then(async () => {
+    await mkdir(dirname(key), { recursive: true })
+    // The heartbeat covers the complete transaction; atomic rename alone does
+    // not serialize competing readers in separate hosts.
+    const release = await lockfile.lock(key, { realpath: false, retries: { retries: 60, minTimeout: 25, maxTimeout: 250 } })
+    try { return await run() } finally { await release() }
+  })
   transactions.set(key, current)
   try { return await current } finally {
     if (transactions.get(key) === current) transactions.delete(key)
@@ -536,6 +601,8 @@ export function reserveDispatch(board: Board, intentId: string, dispatchId: stri
   const intent = requireIntent(board, intentId)
   if (intent.to !== null || intent.closed || !intent.worker) throw new Error('claim intent before spawn')
   if (intent.dispatchId) throw new Error('intent already dispatched')
+  assertFrom(board, intent.from)
+  if (board.policy && openIntents(board).filter(i => i.dispatchId && !i.pendingReturn).length >= board.policy.maxConcurrent) throw new Error('concurrent worker budget exceeded; await returns')
   if (openIntents(board).some(i => i.pendingReturn)) throw new Error('conclude, release or close returned workers before spawn')
   if (nextTask(board).kind === 'reason' || board.reason) throw new Error('finish pending reason before spawn')
   return replaceIntent(board, intentId, { ...intent, dispatchId })

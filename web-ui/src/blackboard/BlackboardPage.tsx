@@ -1,13 +1,13 @@
 import { WorkerReturns } from '@cairn/client/WorkerReturns.tsx'
 import { ArchiveForm } from '../findings/ArchiveForm'
 import '../findings/findings.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { BlackboardGraph, selectedDetail } from '@cairn/client/BlackboardGraph.tsx'
 import { zh, type BlackboardKey } from '@cairn/client/locales.ts'
 import { ensureStyles } from '@cairn/client/styles.ts'
 import type { BoardRead } from '@cairn/view.ts'
 import { readBoardText } from '@cairn/view.ts'
-import { fetchBlackboardFile, fetchBlackboards } from './api'
+import { fetchBlackboardFile, fetchBlackboards, fetchWorkerReturn } from './api'
 import type { BlackboardCatalog, BlackboardListItem, BlackboardWorkspace } from './types'
 
 const POLL_MS = 3_000
@@ -68,7 +68,11 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
   const [loadingList, setLoadingList] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
 
+  const listBusy = useRef(false)
+  const selectedRevision = catalog && selected ? findBoard(catalog, selected)?.board.mtime : undefined
   const refreshList = useCallback(async () => {
+    if (listBusy.current) return
+    listBusy.current = true
     try {
       const next = await fetchBlackboards()
       setCatalog(next)
@@ -80,6 +84,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
     } catch (error: unknown) {
       setListError(error instanceof Error && error.message ? error.message : '读取画板列表失败')
     } finally {
+      listBusy.current = false
       setLoadingList(false)
     }
   }, [])
@@ -94,17 +99,17 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
     return () => window.clearInterval(timer)
   }, [refreshList])
 
+  useEffect(() => { setSelectedId(undefined); setSnapshot(undefined) }, [selected?.workspaceId, selected?.ownerId])
+
   useEffect(() => {
     if (selected === null) {
       setSnapshot(undefined)
       setSelectedId(undefined)
       return
     }
-    setSelectedId(undefined)
-    setSnapshot(undefined)
     const controller = new AbortController()
     const pull = (): void => {
-      void fetchBlackboardFile(selected.workspaceId, selected.ownerId)
+      void fetchBlackboardFile(selected.workspaceId, selected.ownerId, controller.signal)
         .then((file) => {
           if (!controller.signal.aborted) setSnapshot(readBoardText(file.text))
         })
@@ -115,12 +120,10 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
         })
     }
     pull()
-    const timer = window.setInterval(pull, POLL_MS)
     return () => {
       controller.abort()
-      window.clearInterval(timer)
     }
-  }, [selected?.workspaceId, selected?.ownerId])
+  }, [selected?.workspaceId, selected?.ownerId, selectedRevision])
 
   const selectedMeta = catalog && selected ? findBoard(catalog, selected) : null
   const view = snapshot?.kind === 'ready' ? snapshot.view : undefined
@@ -242,7 +245,7 @@ export function BlackboardPage({ initialSelection }: {initialSelection?: Selecti
                     {view.nodes.some(n => n.id === selectedId && n.kind === 'fact') && <button onClick={() => setArchiving(true)}>保存到漏洞成果库</button>}
                   </div>
                 )}
-                <WorkerReturns view={view} selectedId={selectedId} t={t} />
+                <WorkerReturns key={selected?.ownerId} view={view} selectedId={selectedId} t={t} loadReturn={record => fetchWorkerReturn(selected!.workspaceId, selected!.ownerId, record.id)} />
                 {view.hints.length > 0 && (
                   <div className="dsh-bb-hints">
                     <p className="dsh-bb-hints-title">{t('detail.hint')}</p>

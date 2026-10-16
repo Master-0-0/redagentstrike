@@ -22,6 +22,7 @@ await build({
   logLevel: 'info',
   external: [
     '@deepseek-ai/cordis',
+    'proper-lockfile',
     '@deepseek-ai/dsh-tools',
     ...builtinModules,
     ...builtinModules.map(name => `node:${name}`),

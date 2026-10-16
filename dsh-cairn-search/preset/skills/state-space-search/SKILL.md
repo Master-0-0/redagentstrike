@@ -47,21 +47,21 @@ Call `blackboard` with the `op` discriminator. Do not hand-edit YAML or JSON to 
 | Resume a stopped board | `op=reopen` |
 | Revisit a completed goal after explicit feedback | `op=reopen` with non-empty `description`; prior completion is retained as invalidated history |
 
-`init` then loop `next` until `idle` or the board is `completed` / `stopped`.
+`init` then follow `next` until the board is `completed` or explicitly `stopped`. `idle` while workers are running means await their returns and continue; it is not completion. If recovery cannot establish an outcome, report the uncertainty rather than inventing a result.
 
 ## Scheduler
 
 Same worker type, three search tasks plus a prioritized return review. `next` chooses; the parent executes.
 
-1. **Bootstrap** — `next.kind` is `bootstrap`. The parent itself tries the whole origin→goal problem (do not spawn a subagent). If the goal is definitively met, `conclude` the reserved bootstrap intent with the proving fact, then `reason_finish` with `complete`. If not, `conclude` with the best confirmed fact only (never `complete` on a bootstrap miss), then `next` again.
-2. **Reason** — `next.kind` is `reason`. Call `reason_start` (worker `parent`). Reason **may run while explores are in flight**. The trigger is taken at **reason start**: fact count up, hint count up, or open intents went `>0 → 0`. Declaring new intents does **not** retrigger reason. After thinking, `reason_finish` with exactly one of:
-   - `complete: { from, description }` — proving facts, `to` becomes `goal`
-   - `intents: [{ from, target, description }, …]` — at most 3, high-value, non-overlapping, `goal` not in `from`; the engine stores them unclaimed (`worker: null`)
+1. **Bootstrap** — Initialization records origin and goal and schedules reasoning. The parent does not try to solve the problem itself. Declare bounded exploration intents, including initial environment checks if needed; explorers perform those operations. Existing reserved bootstrap intents are closed during protocol migration without inventing evidence.
+2. **Reason** — `next.kind` is `reason`. Call `reason_start` (worker `parent`). Reason **may run while explores are in flight**. The trigger is taken at **reason start**: fact count up, hint count up, or open intents went `>0 → 0`. Declaring new intents does **not** retrigger reason. After thinking, `reason_finish` with the returned `board.reason.id` as `reasonId` with exactly one of:
+   - `complete: { from, description, proofs: [{ criterionId, from, description }] }` — proving facts, `to` becomes `goal`
+   - `intents: [{ from, target, description }, …]` — at most 3 per declaration, within the total open-work limit, high-value, non-overlapping, `goal` not in `from`; the engine stores them unclaimed (`worker: null`)
    - `{}` — no-op when open intents already cover the new situation
-   If open intents is empty and the goal is unmet, you **must** propose intents.
-3. **Explore** — `next.kind` is `explore`. Claim the newest unclaimed non-bootstrap open intent **before** spawning. Spawn one subagent for that intent only. The child returns **one** objective fact, including a negative finding. The parent writes it with `conclude`. On timeout, crash, or refusal to explore, `release` (clear worker, leave `to` null). Release is **not** a reason trigger.
+   If open intents is empty and the goal is unmet, propose intents within the remaining budget. If that budget is exhausted, stop and report the unmet criteria.
+3. **Explore** — `next.kind` is `explore`. Claim the next scheduled intent **before** spawning. Spawn one subagent for that intent only. The child returns **one** objective fact, including a negative finding. The parent writes it with `conclude`. On timeout, crash, or refusal to explore, `release` (clear worker, leave `to` null). Release is **not** a reason trigger.
 
-Review takes priority in every active state. After reviews, if `next` says reason, reason even if explores are still in flight; otherwise consume the newest claimable explore. Start independent explores in one turn; do not wait for one before claiming another.
+Review takes priority in every active state. After reviews, if `next` says reason, reason even if explores are still in flight; otherwise claim the intent returned by `next` (oldest eligible work). Start independent explores within the concurrent budget; do not wait for one before claiming another.
 
 ## Explore subagent prompt
 
@@ -70,7 +70,8 @@ Spawn with `run_in_background` default (continuable). Set `run_in_background: fa
 Give the child:
 
 - start the prompt with `blackboard_intent: iNNN` and a newline; the runtime requires a prior claim and binds the spawned child to this intent
-- the current board snapshot as JSON (from the `claim` / `snapshot` result)
+- only the relevant direct premises and evidence references; do not copy the complete historical board
+- declare exact required execution skill names in the intent `skills` field; the runtime includes these in the child task
 - `intent_id` and `intent_description`
 - instruction: explore **only** this intent; return one JSON object `{"description": "..."}`; do not propose new intents; do not call `blackboard`; do not edit `.dsh/blackboards/`; put bulky evidence in a file and reference it; a thorough negative result is a valid fact
 - authorization: same as this skill
@@ -111,3 +112,11 @@ Completion requires an observed fact (not origin alone) and no open intents. Ind
 Before parent steps and on `snapshot`/`next`, the runtime checks bound children through the Harness catalog. `inactive`, missing children and diagnostic rows indicate uncertain outcomes, not proven failure. Inspect the child's actual result before concluding, releasing or closing; continue observing if unsure. A failed catalog query retains claims and returns a warning. There is no automatic retry, timeout release, or synthesized finding. Recovered observations clear without erasing their history. Claims with unfinished spawn calls are excluded from recovery checks.
 
 To reopen a completed goal, require explicit feedback and pass it as `description`. The feedback becomes a hint, not a verified fact. The prior completion remains visible as invalidated history; the next reason cycle must reevaluate the evidence. Calling reopen again on an active board is a no-op. Unrelated goals should use a new board.
+
+## Coordinator boundary
+
+The parent schedules, reviews evidence and checks goal coverage. It does not execute shell commands, search the workspace, probe networks or modify files. Read/read_image are for reviewing returned evidence only. Delegate those operations as intents. Explorers use cairn-explorer, not this scheduler skill. Workflow and Ralph bypasses are unavailable in Cairn.
+
+A pending reason survives interruption: resume it with the recorded worker and finish it. A claimed intent without a dispatch is returned for dispatch again; reuse its worker. Do not release active work merely because a wall-clock interval elapsed. Dispatch budgets are enforced atomically. Repeated failures exhaust the retry budget and close that direction; use new evidence or explicit feedback before redeclaring it.
+
+Initialize explicit acceptance criteria when the goal has several conditions. Before completion, inspect every condition and give exactly one observed-evidence proof per criterion; include all proof fact IDs in complete.from. Structural checks cannot verify the truth of natural-language claims. If the exploration budget is exhausted without sufficient evidence, explain remaining gaps and stop the board; do not manufacture progress hints to reset budgets.

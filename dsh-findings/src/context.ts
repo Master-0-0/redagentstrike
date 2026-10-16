@@ -1,7 +1,8 @@
 import { realpath, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { ArchiveError, readSafe } from './artifacts.ts'
+import { readBoardFacts } from './board-facts.ts'
+import { ArchiveError } from './artifacts.ts'
 
 type Session = { id: string; header?: { cwd?: string; parentSession?: string; origin?: string } }
 export function encodeOwner(id: string) {
@@ -52,22 +53,7 @@ export async function sourceContext(ctx: any, exec: any, factIds: string[], sign
   }
   if (factIds.length) {
     if (!resolved) throw new ArchiveError('context_missing', '父链缺失，无法可靠读取引用事实')
-    const board = JSON.parse(
-      (
-        await readSafe(
-          root,
-          `.dsh/blackboards/${encodeOwner(current.id)}.json`,
-          1024 * 1024,
-          signal,
-        )
-      ).toString(),
-    )
-    source.fact_snapshots = [...new Set(factIds)].map((id) => {
-      const fact = board.facts?.find((f: any) => f.id === id)
-      if (!fact || typeof fact.description !== 'string')
-        throw new ArchiveError('invalid_manifest', `事实不存在：${id}`)
-      return { id, description: fact.description }
-    })
+    source.fact_snapshots = await readBoardFacts(root, `.dsh/blackboards/${encodeOwner(current.id)}.json`, factIds, signal)
   }
   // Registry lookup is optional; lack of an ID never changes workspace identity.
   try {

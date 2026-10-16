@@ -15,7 +15,7 @@ import { BlackboardGraph, selectedDetail } from './BlackboardGraph.tsx'
 import type { BoardSnapshot } from './rpc.ts'
 
 const PANEL_GAP = 8
-const POLL_MS = 1500
+const POLL_MS = 3000
 
 export interface SessionListSlice {
   current?: string
@@ -28,6 +28,7 @@ export interface BlackboardSidebarPanelFace {
 }
 
 export interface BlackboardSidebarPanelProps {
+  readReturn?: (sessionId: string, path: string) => Promise<string>
   wide: boolean
   useSessions: <T>(selector: (state: SessionListSlice) => T) => T
   t: (key: string, params?: Record<string, unknown>) => string
@@ -39,7 +40,7 @@ export interface BlackboardSidebarPanelProps {
  * @param props - column geometry, session selector, copy, and the bound read.
  */
 export function BlackboardSidebarPanel({
-  wide, useSessions, t, readBoard,
+  wide, useSessions, t, readBoard, readReturn,
 }: BlackboardSidebarPanelProps) {
   const current = useSessions((state) => state.current)
   const byId = useSessions((state) => state.byId) ?? {}
@@ -72,14 +73,17 @@ export function BlackboardSidebarPanel({
     }
     setSnapshot(undefined)
     const controller = new AbortController()
+    let busy = false
     const pull = (): void => {
+      if (busy || controller.signal.aborted) return
+      busy = true
       void readRef.current(current, ownerId, controller.signal).then((next) => {
         if (!controller.signal.aborted) setSnapshot(next)
       }).catch((error: unknown) => {
         if (controller.signal.aborted) return
         const message = error instanceof Error ? error.message : String(error)
         setSnapshot({ kind: 'error', message })
-      })
+      }).finally(() => { busy = false })
     }
     pull()
     const timer = window.setInterval(pull, POLL_MS)
@@ -205,7 +209,7 @@ function panelBody({
           <p className="dsh-bb-detail-body">{detail.body}</p>
         </div>
       )}
-      <WorkerReturns view={view} selectedId={selectedId} t={t} />
+      <WorkerReturns key={ownerId} view={view} selectedId={selectedId} t={t} loadReturn={readReturn ? record => record.contentRef ? readReturn(current!, record.contentRef) : Promise.resolve(record.content) : undefined} />
       {view.hints.length > 0 && (
         <div className="dsh-bb-hints">
           <p className="dsh-bb-hints-title">{t('detail.hint')}</p>

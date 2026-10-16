@@ -17,7 +17,7 @@ Out-of-tree DeepSeek Harness plugin. Implements a **fact-intent blackboard** for
 
 ## Persistence
 
-Workspace file `<cwd>/.dsh/blackboards/<main-session-id>.json` (`boardRelativePath`). JSON, pretty-printed, atomic write (temp + rename). Create `.dsh/blackboards/` as needed.
+Workspace file `<cwd>/.dsh/blackboards/<main-session-id>.json` (`boardRelativePath`). Small boards use pretty-printed JSON; at 512 total records this becomes an atomic `cairn-segments-v1` manifest referencing immutable 256-record blocks in `.dsh/blackboard-segments/`. Readers must hydrate the manifest before interpreting the board. Transactions use a heartbeat filesystem lock across host processes. Large worker returns use immutable content-addressed workspace files; retain blocks and returns across forks. Publish referenced content before the manifest. Do not delete historical blocks without tracing all fork references.
 
 Ownership:
 
@@ -41,10 +41,10 @@ Resolve cwd from `exec.agent.session.header.cwd`. Owner id walks `origin === 'su
 - Claim before explore: set `worker` then return the intent. Never start then claim.
 - Reason **declares** intents with `worker: null`. Truncate to `MAX_INTENTS`.
 - Reason may run while explores are in flight. Trigger vs checkpoint taken at **reason start**: factCount↑, hintCount↑, or openIntents `>0 → 0`. Declaring intents does not retrigger.
-- Explore picks the **newest** unclaimed non-bootstrap open intent (`createdAt`).
+- Protocol v2 explores oldest eligible work, resumes a claim without dispatch, and enforces persisted open/concurrent/retry limits. Legacy pure-domain fixtures retain their old ordering.
 - Explore failure / release: `worker=null`, `to` still null. That is **not** a reason trigger.
-- Bootstrap reserved intent: `from=["origin"]`, `description="bootstrap"`, `creator="dispatcher.bootstrap"`.
-- Bootstrap execute success: one fact + complete. Bootstrap conclude: fact only.
+- Protocol v2 initializes directly into reason. Migrate an unfinished legacy bootstrap intent by closing it without inventing a fact. Preserve finished bootstrap history.
+- Protocol v2 conclude requires an actual unresolved dispatched worker return. Status observations do not qualify.
 - `stopped`: reject graph writes; hints and archived worker returns remain writable. No conclude fallback.
 - Worker returns are separate from hints. `next=review` takes priority; only the parent concludes facts.
 - Completed boards reopen only with explicit feedback; retain old completion as invalidated history.
@@ -56,20 +56,21 @@ Single model-facing tool. `op` discriminator:
 
 | op | args | result |
 |---|---|---|
-| `init` | title, origin, goal, hints? | snapshot + next |
+| `init` | title, origin, goal, hints?, criteria? | bounded snapshot + next |
 | `snapshot` | | board |
 | `next` | | NextTask |
 | `claim` | intentId, worker | intent |
 | `conclude` | intentId, description, worker | fact + intent |
 | `reason_start` | worker | trigger + snapshot |
-| `reason_finish` | worker, complete? \| intents? \| {} | snapshot + next |
+| `reason_finish` | worker, reasonId, complete? \| intents? \| {} | bounded snapshot + next |
+| `lookup` | section, offset?, limit?, id?, contentOffset? | paginated history or complete item text chunks |
 | `hint` | content, creator? | hint |
 | `release` | intentId | intent |
 | `stop` | | board |
 | `reopen` | description required when completed | board + next |
 
-`complete` on reason_finish: `{ from: string[], description: string }`.
-`intents` on reason_finish: `{ from: string[], description: string }[]`.
+`complete` on reason_finish: `{ from: string[], description: string, proofs: { criterionId: string, from: string[], description: string }[] }`. Supply exactly one proof per acceptance criterion using current observed facts.
+`intents` on reason_finish: `{ from: string[], description: string, target?: string, skills?: string[] }[]`. Carry the current persisted `reasonId`; stale reasoning submissions are rejected.
 
 Resolve cwd from `exec.agent.session.header.cwd`. Owner id is the subagent lineage root (a conversation fork is its own root). Reject if cwd is missing.
 
