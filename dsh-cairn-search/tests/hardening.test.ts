@@ -72,7 +72,8 @@ test('concurrent board writes retain both hints', async () => {
       const b = (await loadBoard(cwd, 'p'))!
       await saveBoard(cwd, 'p', addHint(b, content, 'user').board)
     })))
-    assert.deepEqual((await loadBoard(cwd, 'p'))!.hints.map(h => h.content), ['one', 'two'])
+    // Concurrent callers have no promised arrival order; both writes must survive.
+    assert.deepEqual((await loadBoard(cwd, 'p'))!.hints.map(h => h.content).sort(), ['one', 'two'])
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 
@@ -167,7 +168,7 @@ test('tool API protects existing boards, returns next and forbids child writes',
   const exec = { agent: { session: { id: 'p', header: { cwd } } } }
   try {
     const first = await definition.execute({ op: 'init', title: 't', origin: 'o', goal: 'g' }, exec)
-    assert.equal(first.next.kind, 'bootstrap')
+    assert.equal(first.next.kind, 'reason')
     await assert.rejects(() => definition.execute({ op: 'init', title: 'overwrite', origin: 'o', goal: 'g' }, exec), /already exists/)
     const child = { agent: { session: { id: 'child', header: { cwd, origin: 'subagent', parentSession: 'p' } } } }
     await assert.rejects(() => definition.execute({ op: 'hint', content: 'child write' }, child), /only the parent/)

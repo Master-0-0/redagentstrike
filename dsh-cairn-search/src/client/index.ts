@@ -2,7 +2,7 @@
 
 import { BlackboardSidebarPanel } from './BlackboardSidebarPanel.tsx'
 import { NS, en, zh } from './locales.ts'
-import { loadBoardSnapshot, type WorkspaceFilesReadRemote } from './rpc.ts'
+import { loadBoardSnapshot, loadReturnText, type WorkspaceFilesReadRemote } from './rpc.ts'
 import { ensureStyles } from './styles.ts'
 
 export const name = 'dsh-cairn-search'
@@ -16,6 +16,7 @@ interface SlotsRuntime {
     order: number
     locale: string
     inject: () => {
+      readReturn: (sessionId: string, path: string) => Promise<string>
       readBoard: (
         sessionId: string,
         ownerId: string,
@@ -53,6 +54,7 @@ export function apply(ctx: BrowserContext): void {
       order: -10,
       locale: NS,
       inject: () => ({
+        readReturn: (sessionId: string, path: string) => loadReturnText(remote, sessionId, path),
         readBoard: (sessionId: string, ownerId: string, signal: AbortSignal) => (
           loadBoardSnapshot(remote, sessionId, ownerId, signal)
         ),

@@ -37,6 +37,12 @@ test('loadBoardSnapshot treats not-found as missing', async () => {
   )
 })
 
+test('loadBoardSnapshot terminates a non-advancing page', async () => {
+  const remote = fakeRead([{ text: '', offset: 1, lines: 0, eof: false }])
+  const result = await loadBoardSnapshot(remote, 'sess', 'main-a', new AbortController().signal)
+  assert.equal(result.kind, 'error')
+})
+
 test('loadBoardSnapshot reads the owner-scoped board path', async () => {
   const paths: string[] = []
   const remote: WorkspaceFilesReadRemote = {

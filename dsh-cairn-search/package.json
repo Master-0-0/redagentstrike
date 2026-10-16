@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Fact-intent blackboard tools and sidebar graph for the Cairn 搜索 DeepSeek Harness preset",
+  "description": "Fact-intent blackboard tools and sidebar graph for the Cairn \u641c\u7d22 DeepSeek Harness preset",
   "main": "./lib/index.js",
   "exports": {
     ".": "./lib/index.js",
@@ -13,7 +13,9 @@
   "files": [
     "lib/index.js",
     "lib/client.js",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "preset",
+    "scripts/install-preset.mjs"
   ],
   "dsh": {
     "bundle": {
@@ -32,17 +34,27 @@
     "build": "node scripts/build.mjs",
     "link-peers": "node scripts/link-peers.mjs",
     "postinstall": "node scripts/link-peers.mjs",
-    "test": "node --test --experimental-strip-types tests/*.test.ts"
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "install-preset": "node scripts/install-preset.mjs",
+    "test:integration": "node scripts/smoke-harness.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-tools": "*"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis": { "optional": true },
-    "@deepseek-ai/dsh-tools": { "optional": true }
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
+  },
+  "dependencies": {
+    "proper-lockfile": "^4.1.2",
+    "yaml": "^2.9.1"
   }
 }

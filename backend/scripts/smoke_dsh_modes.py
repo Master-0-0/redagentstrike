@@ -154,13 +154,13 @@ def timeline_for(marker: str) -> list[dict[str, Any]]:
 def prompt_for(mode: str, target: str) -> str:
     extra = ""
     if mode == "cairn":
-        extra = "不要开 explorer，不要 blackboard。主会话自己执行。\n"
+        extra = "按 Cairn 协议初始化黑板，声明并领取一个 intent，把下面全部命令分配给一个 explorer，主会话审阅其原始输出和证据后完成黑板。主会话不要直接执行命令。\n"
     if mode == "minimal":
         extra = "没有 skill 工具，直接 bash。\n"
     return (
         extra
         + "捕获已开，环境里已有 HTTP_PROXY=http://127.0.0.1:8088。不要再加 -x 指向池节点，也不要用 -x 指向 8088。\n"
-        + "不要解释。立刻用 bash 按顺序只执行下面命令，把完整 stdout 原样贴回，然后停止：\n"
+        + ("让 explorer 用 bash 按顺序执行下面命令并返回完整 stdout；主会话完成证据审阅后报告结果：\n" if mode == "cairn" else "不要解释。立刻用 bash 按顺序只执行下面命令，把完整 stdout 原样贴回，然后停止：\n")
         + "echo SMOKE_MODE={}\n".format(mode)
         + "curl -sS -X POST http://127.0.0.1:8787/proxy-pool/agent "
         + "-H 'Content-Type: application/json' -d '{\"op\":\"get\"}'\n"

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import pytest
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -86,6 +88,32 @@ def _write_board(workspace: Path, owner_id: str, board: dict) -> Path:
     path = board_dir / "{}.json".format(owner_id)
     path.write_text(json.dumps(board, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def test_segmented_board_reads_exact_snapshot_and_rejects_corruption(tmp_path: Path):
+    home, project = tmp_path / "home", tmp_path / "project"
+    project.mkdir()
+    _write_registry(home, {"ws": {"path": str(project)}})
+    directory = project / ".dsh/blackboard-segments"
+    directory.mkdir(parents=True)
+    manifest = {key: value for key, value in EXAMPLE_BOARD.items() if key not in {"facts", "intents", "hints", "workerReturns"}}
+    manifest.update(storageFormat="cairn-segments-v1", segments={})
+    for field in ("facts", "intents", "hints", "workerReturns"):
+        values = EXAMPLE_BOARD.get(field, [])
+        refs = []
+        if values:
+            content = json.dumps(values).encode()
+            filename = hashlib.sha256(content).hexdigest() + ".json"
+            (directory / filename).write_bytes(content)
+            refs.append({"path": ".dsh/blackboard-segments/" + filename, "count": len(values)})
+        manifest["segments"][field] = refs
+    _write_board(project, "p", manifest)
+    read = json.loads(read_blackboard(home, "ws", "p")["text"])
+    assert read["facts"] == EXAMPLE_BOARD["facts"]
+    assert list_blackboards(home)["workspaces"][0]["boards"][0]["title"] == EXAMPLE_BOARD["title"]
+    (project / manifest["segments"]["facts"][0]["path"]).write_text("[]")
+    with pytest.raises(BlackboardBadRequest, match="integrity"):
+        read_blackboard(home, "ws", "p")
 
 
 def test_lists_boards_from_registered_workspaces(tmp_path: Path):
@@ -212,3 +240,24 @@ def test_blackboards_http_routes(tmp_path: Path):
         assert json.loads(detail.json()["text"])["title"] == EXAMPLE_BOARD["title"]
         assert client.get("/blackboards/ws-a/../secret").status_code in {400, 404}
         assert client.get("/blackboards/nope/session-one").status_code == 404
+
+
+def test_archived_worker_return_is_resolved_through_its_board(tmp_path: Path):
+    import pytest
+    from workbench.blackboards import read_blackboard_return
+    home, workspace = tmp_path / 'home', tmp_path / 'workspace'
+    workspace.mkdir()
+    _write_registry(home, {'ws': {'path': str(workspace), 'title': 'test'}})
+    reference = '.dsh/blackboard-content/' + 'a' * 64 + '.txt'
+    content_path = workspace / reference
+    content_path.parent.mkdir(parents=True)
+    content_path.write_text('完整返回', encoding='utf-8')
+    board = {**EXAMPLE_BOARD, 'workerReturns': [{'id': 'r001', 'content': 'preview', 'contentRef': reference}]}
+    _write_board(workspace, 'p', board)
+    assert read_blackboard_return(home, 'ws', 'p', 'r001')['text'] == '完整返回'
+    with pytest.raises(BlackboardNotFound):
+        read_blackboard_return(home, 'ws', 'p', 'absent')
+    board['workerReturns'][0]['contentRef'] = '../outside'
+    _write_board(workspace, 'p', board)
+    with pytest.raises(BlackboardBadRequest):
+        read_blackboard_return(home, 'ws', 'p', 'r001')

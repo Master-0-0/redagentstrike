@@ -81,7 +81,7 @@ export function BlackboardGraph({ view, selectedId, onSelect, t }: BlackboardGra
             key={node.id}
             node={node}
             selected={selectedId === node.id}
-            kicker={node.supersededBy?.length ? t('kind.superseded') : t(`kind.${node.kind}`)}
+            kicker={node.invalid ? t('kind.invalid') : node.supersededBy?.length ? t('kind.superseded') : t(`kind.${node.kind}`)}
             onSelect={onSelect}
           />
         ))}
@@ -113,7 +113,7 @@ function NodeCard({
     <g
       className="dsh-bb-node"
       data-kind={node.kind}
-      data-superseded={!!node.supersededBy?.length || undefined}
+      data-superseded={node.invalid || !!node.supersededBy?.length || undefined}
       data-selected={selected || undefined}
       transform={`translate(${node.x} ${node.y})`}
       role="button"

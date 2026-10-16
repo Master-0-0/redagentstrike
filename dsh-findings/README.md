@@ -59,3 +59,9 @@ npm run build --prefix web-ui
 `backend/scripts/smoke_findings_ui.py` 和 `smoke_findings_entries.py` 用 Playwright 验证真实工作台 API/UI。后者明确以 UI fixture 替代扫描结果，不发起目标扫描。
 
 `scripts/smoke-harness.mjs API_URL ABSOLUTE_WORKSPACE` 通过安装后的插件包、真实 Cordis 注册、preset loader、skill loader、子代理 runtime 和工具执行管线提交材料。LLM transport 为确定性 adapter，避免模型调用和网络测试。运行前在隔离工作区准备一张 `response.png` fixture；其余测试材料由脚本生成。脚本会删除它创建的源文件并验证归档副本，不能对真实测试工作区执行此 smoke。测试生成 `tool-result.json` 和 `verification.json`。后端也应使用独立 `WORKBENCH_DATA` 和 `WORKBENCH_DSH_HOME`。
+
+### Large Cairn boards
+
+Fact references are resolved by streaming the board's facts collection through the anchored file reader. Unrelated historical worker output no longer counts against the 1 MiB fact receipt budget or requires loading the whole board into memory. The receipt limit applies to selected descriptions. Existing snapshots remain immutable when source facts are later superseded.
+
+For `cairn-segments-v1` manifests, the reader follows only fact segments, verifies their SHA-256 content and record counts, and streams them through the same anchored reader. Missing or modified segments fail the archive request rather than producing incomplete evidence.

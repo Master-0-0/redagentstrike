@@ -28,8 +28,9 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/client/WorkerReturns.tsx
+var import_react = require("react");
 var import_jsx_runtime = require("react/jsx-runtime");
-function WorkerReturns({ view, selectedId, t }) {
+function WorkerReturns({ view, selectedId, t, loadReturn }) {
   const intentId = view.intents.find((i) => i.id === selectedId)?.intentId;
   const records = view.workerReturns.filter((r) => !intentId || r.intentId === intentId);
   if (!records.length) return null;
@@ -44,13 +45,30 @@ function WorkerReturns({ view, selectedId, t }) {
         record.createdAt
       ] }),
       record.subagentId && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: record.subagentId }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: record.content })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ReturnContent, { record, loadReturn, t })
     ] }, record.id))
+  ] });
+}
+function ReturnContent({ record, loadReturn, t }) {
+  const [content, setContent] = (0, import_react.useState)();
+  const [error, setError] = (0, import_react.useState)();
+  const [busy, setBusy] = (0, import_react.useState)(false);
+  const [limit, setLimit] = (0, import_react.useState)(6e3);
+  const text = content ?? record.content;
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { children: text.slice(0, limit) }),
+    text.length > limit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: () => setLimit(limit + 6e3), children: t("returns.more") }),
+    record.contentRef && content === void 0 && loadReturn && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { disabled: busy, onClick: () => {
+      setBusy(true);
+      setError(void 0);
+      void loadReturn(record).then(setContent).catch((e) => setError(String(e))).finally(() => setBusy(false));
+    }, children: t("returns.load") }),
+    error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { role: "alert", children: error })
   ] });
 }
 
 // src/client/BlackboardSidebarPanel.tsx
-var import_react2 = require("react");
+var import_react3 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/owner.ts
@@ -66,8 +84,8 @@ function encodeBoardOwnerId(id) {
   }
   return out;
 }
-function boardRelativePath(ownerId) {
-  return `${BOARD_DIR_RELATIVE}/${encodeBoardOwnerId(ownerId)}.json`;
+function boardRelativePath(ownerId2) {
+  return `${BOARD_DIR_RELATIVE}/${encodeBoardOwnerId(ownerId2)}.json`;
 }
 function boardOwnerId(from, lookup) {
   const seen = /* @__PURE__ */ new Set();
@@ -112,7 +130,33 @@ function lineageFromList(id, list) {
 }
 
 // src/client/BlackboardGraph.tsx
-var import_react = require("react");
+var import_react2 = require("react");
+
+// src/evidence.ts
+function invalidFactIds(board) {
+  const invalid = new Set(board.facts.flatMap((f) => f.supersedes ?? []));
+  const facts = new Map(board.facts.map((f) => [f.id, f]));
+  const dependents = /* @__PURE__ */ new Map();
+  for (const intent of board.intents) {
+    if (!intent.to || intent.to === "goal") continue;
+    const replacement = new Set(facts.get(intent.to)?.supersedes ?? []);
+    for (const premise of intent.from) {
+      if (replacement.has(premise)) continue;
+      const outputs = dependents.get(premise) ?? [];
+      outputs.push(intent.to);
+      dependents.set(premise, outputs);
+    }
+  }
+  const queue = [...invalid];
+  for (let index = 0; index < queue.length; index++) {
+    for (const output of dependents.get(queue[index]) ?? []) {
+      if (invalid.has(output)) continue;
+      invalid.add(output);
+      queue.push(output);
+    }
+  }
+  return invalid;
+}
 
 // src/types.ts
 var ORIGIN_ID = "origin";
@@ -186,19 +230,46 @@ function parseBoard(text) {
 function layoutBoard(board) {
   const columns = /* @__PURE__ */ new Map();
   columns.set(ORIGIN_ID, 0);
-  const visiting = /* @__PURE__ */ new Set();
-  const columnOf = (id) => {
-    const held = columns.get(id);
-    if (held !== void 0) return held;
-    if (visiting.has(id)) return 1;
-    visiting.add(id);
-    const incoming = board.intents.filter((intent) => intent.to === id && !intent.invalidated);
-    const col = incoming.length === 0 ? 2 : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))));
-    visiting.delete(id);
-    columns.set(id, col);
-    return col;
-  };
-  for (const fact of board.facts) columnOf(fact.id);
+  const invalid = invalidFactIds(board);
+  const superseders = /* @__PURE__ */ new Map();
+  const dependencies = /* @__PURE__ */ new Map();
+  const outputs = /* @__PURE__ */ new Map();
+  const known = new Set(board.facts.map((f) => f.id));
+  for (const fact of board.facts) {
+    for (const id of fact.supersedes ?? []) {
+      const list = superseders.get(id) ?? [];
+      list.push(fact.id);
+      superseders.set(id, list);
+    }
+  }
+  for (const intent of board.intents) {
+    if (!intent.to || intent.invalidated || !known.has(intent.to)) continue;
+    const deps = dependencies.get(intent.to) ?? /* @__PURE__ */ new Set();
+    for (const id of intent.from) {
+      if (!known.has(id)) continue;
+      deps.add(id);
+      const list = outputs.get(id) ?? /* @__PURE__ */ new Set();
+      list.add(intent.to);
+      outputs.set(id, list);
+    }
+    dependencies.set(intent.to, deps);
+  }
+  const remaining = new Map([...dependencies].map(([id, deps]) => [id, deps.size]));
+  const queue = board.facts.filter((f) => f.id === ORIGIN_ID || !remaining.get(f.id)).map((f) => f.id);
+  for (const id of queue) columns.set(id, id === ORIGIN_ID ? 0 : 2);
+  const heights = /* @__PURE__ */ new Map();
+  for (let index = 0; index < queue.length; index++) {
+    const id = queue[index];
+    for (const output of outputs.get(id) ?? []) {
+      heights.set(output, Math.max(heights.get(output) ?? 2, (columns.get(id) ?? 0) + 2));
+      remaining.set(output, (remaining.get(output) ?? 1) - 1);
+      if (remaining.get(output) === 0 && !columns.has(output)) {
+        columns.set(output, heights.get(output));
+        queue.push(output);
+      }
+    }
+  }
+  for (const fact of board.facts) if (!columns.has(fact.id)) columns.set(fact.id, 2);
   const factColumns = board.facts.filter((fact) => fact.id !== GOAL_ID).map((fact) => columns.get(fact.id) ?? 1);
   const maxFactCol = factColumns.length === 0 ? 0 : Math.max(...factColumns);
   columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 2, maxFactCol + 2));
@@ -222,7 +293,8 @@ function layoutBoard(board) {
         id,
         kind: id === ORIGIN_ID ? "origin" : id === GOAL_ID ? "goal" : "fact",
         description: fact.description,
-        supersededBy: board.facts.filter((f) => f.supersedes?.includes(id)).map((f) => f.id),
+        supersededBy: superseders.get(id) ?? [],
+        invalid: invalid.has(id),
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
@@ -298,12 +370,17 @@ Closed: ${intent.closed.reason}` : intent.description,
     height: PAD * 2 + Math.max(NODE_HEIGHT, maxBottom - PAD)
   };
 }
+var lastText;
+var lastRead;
 function readBoardText(text) {
+  if (text === lastText && lastRead) return lastRead;
   const trimmed = text.trim();
   if (trimmed === "") return { kind: "missing" };
   const board = parseBoard(trimmed);
   if (board === null) return { kind: "invalid", message: "blackboard.json is not a valid board" };
-  return { kind: "ready", view: layoutBoard(board) };
+  lastText = text;
+  lastRead = { kind: "ready", view: layoutBoard(board) };
+  return lastRead;
 }
 function nodeAnchor(node, side) {
   return {
@@ -357,7 +434,7 @@ function parseReason(value) {
   if (!isRecord(value)) return void 0;
   if (typeof value.worker !== "string" || typeof value.startedAt !== "string") return void 0;
   if (value.trigger !== "initial" && value.trigger !== "new-fact" && value.trigger !== "new-hint" && value.trigger !== "intents-empty") return void 0;
-  return { worker: value.worker, trigger: value.trigger, startedAt: value.startedAt };
+  return { worker: value.worker, trigger: value.trigger, startedAt: value.startedAt, ...typeof value.id === "string" ? { id: value.id } : {} };
 }
 function isStatus(value) {
   return value === "active" || value === "stopped" || value === "completed";
@@ -377,11 +454,11 @@ function validWorkerReturn(value) {
 // src/client/BlackboardGraph.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
 function BlackboardGraph({ view, selectedId, onSelect, t }) {
-  const viewport = (0, import_react.useRef)(null);
-  const [zoom, setZoom] = (0, import_react.useState)(1);
-  const [availableWidth, setAvailableWidth] = (0, import_react.useState)(560);
-  const markerId = (0, import_react.useId)().replace(/:/g, "");
-  (0, import_react.useEffect)(() => {
+  const viewport = (0, import_react2.useRef)(null);
+  const [zoom, setZoom] = (0, import_react2.useState)(1);
+  const [availableWidth, setAvailableWidth] = (0, import_react2.useState)(560);
+  const markerId = (0, import_react2.useId)().replace(/:/g, "");
+  (0, import_react2.useEffect)(() => {
     const element = viewport.current;
     if (!element) return;
     const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width));
@@ -455,7 +532,7 @@ function BlackboardGraph({ view, selectedId, onSelect, t }) {
             {
               node,
               selected: selectedId === node.id,
-              kicker: node.supersededBy?.length ? t("kind.superseded") : t(`kind.${node.kind}`),
+              kicker: node.invalid ? t("kind.invalid") : node.supersededBy?.length ? t("kind.superseded") : t(`kind.${node.kind}`),
               onSelect
             },
             node.id
@@ -487,7 +564,7 @@ function NodeCard({
     {
       className: "dsh-bb-node",
       "data-kind": node.kind,
-      "data-superseded": !!node.supersededBy?.length || void 0,
+      "data-superseded": node.invalid || !!node.supersededBy?.length || void 0,
       "data-selected": selected || void 0,
       transform: `translate(${node.x} ${node.y})`,
       role: "button",
@@ -602,17 +679,18 @@ function CardContent({ width, height, kicker, id, description, statusLabel }) {
 // src/client/BlackboardSidebarPanel.tsx
 var import_jsx_runtime3 = require("react/jsx-runtime");
 var PANEL_GAP = 8;
-var POLL_MS = 1500;
+var POLL_MS = 3e3;
 function BlackboardSidebarPanel({
   wide,
   useSessions,
   t,
-  readBoard
+  readBoard,
+  readReturn: readReturn2
 }) {
   const current = useSessions((state) => state.current);
   const byId = useSessions((state) => state.byId) ?? {};
   const catalogs = useSessions((state) => state.subagentsByParent);
-  const ownerId = (0, import_react2.useMemo)(() => {
+  const ownerId2 = (0, import_react3.useMemo)(() => {
     try {
       return boardOwnerFromList({
         current,
@@ -623,29 +701,34 @@ function BlackboardSidebarPanel({
       return current;
     }
   }, [byId, catalogs, current]);
-  const ownerTitle = ownerId === void 0 ? void 0 : byId[ownerId]?.displayTitle;
-  const [open, setOpen] = (0, import_react2.useState)(false);
-  const [anchor, setAnchor] = (0, import_react2.useState)();
-  const [snapshot, setSnapshot] = (0, import_react2.useState)();
-  const [selectedId, setSelectedId] = (0, import_react2.useState)();
-  const rootRef = (0, import_react2.useRef)(null);
-  const readRef = (0, import_react2.useRef)(readBoard);
+  const ownerTitle = ownerId2 === void 0 ? void 0 : byId[ownerId2]?.displayTitle;
+  const [open, setOpen] = (0, import_react3.useState)(false);
+  const [anchor, setAnchor] = (0, import_react3.useState)();
+  const [snapshot, setSnapshot] = (0, import_react3.useState)();
+  const [selectedId, setSelectedId] = (0, import_react3.useState)();
+  const rootRef = (0, import_react3.useRef)(null);
+  const readRef = (0, import_react3.useRef)(readBoard);
   readRef.current = readBoard;
-  (0, import_react2.useEffect)(() => {
+  (0, import_react3.useEffect)(() => {
     setSelectedId(void 0);
-    if (!open || current === void 0 || ownerId === void 0) {
+    if (!open || current === void 0 || ownerId2 === void 0) {
       setSnapshot(void 0);
       return;
     }
     setSnapshot(void 0);
     const controller = new AbortController();
+    let busy = false;
     const pull = () => {
-      void readRef.current(current, ownerId, controller.signal).then((next) => {
+      if (busy || controller.signal.aborted) return;
+      busy = true;
+      void readRef.current(current, ownerId2, controller.signal).then((next) => {
         if (!controller.signal.aborted) setSnapshot(next);
       }).catch((error) => {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
         setSnapshot({ kind: "error", message });
+      }).finally(() => {
+        busy = false;
       });
     };
     pull();
@@ -654,8 +737,8 @@ function BlackboardSidebarPanel({
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [current, ownerId, open]);
-  (0, import_react2.useLayoutEffect)(() => {
+  }, [current, ownerId2, open]);
+  (0, import_react3.useLayoutEffect)(() => {
     if (!open) return;
     const place = () => {
       const rect = rootRef.current?.getBoundingClientRect();
@@ -680,7 +763,7 @@ function BlackboardSidebarPanel({
         className: "dsh-bb-panel",
         style: anchor,
         "data-blackboard-panel": true,
-        "data-blackboard-owner": ownerId,
+        "data-blackboard-owner": ownerId2,
         "aria-label": t("panel.title"),
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("header", { className: "dsh-bb-header", children: [
@@ -766,7 +849,7 @@ function panelBody({
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-detail-kicker", children: detail.kicker }),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-detail-body", children: detail.body })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(WorkerReturns, { view, selectedId, t }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(WorkerReturns, { view, selectedId, t, loadReturn: readReturn ? (record) => record.contentRef ? readReturn(current, record.contentRef) : Promise.resolve(record.content) : void 0 }, ownerId),
     view.hints.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "dsh-bb-hints", children: [
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-hints-title", children: t("detail.hint") }),
       view.hints.map((hint) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "dsh-bb-hint", children: hint.content }, hint.id))
@@ -784,6 +867,8 @@ function BlackboardIcon({ size }) {
 var NS = "blackboard";
 var zh = {
   "intent.invalidated": "\u5386\u53F2\u5B8C\u6210\uFF08\u5DF2\u5931\u6548\uFF09",
+  "returns.load": "\u8BFB\u53D6\u5B8C\u6574\u8FD4\u56DE",
+  "returns.more": "\u663E\u793A\u66F4\u591A",
   "returns.title": "\u5B50\u4EE3\u7406\u8FD4\u56DE",
   "returns.unlinked": "\u672A\u5173\u8054\u4EFB\u52A1",
   "returns.pending": "\u5F85\u5BA1\u6838",
@@ -823,6 +908,7 @@ var zh = {
   "legend.goal": "\u76EE\u6807",
   "legend.fact": "\u4E8B\u5B9E",
   "legend.open": "\u63A2\u7D22\u4E2D",
+  "kind.invalid": "\u8BC1\u636E\u5DF2\u5931\u6548",
   "kind.superseded": "\u5DF2\u66FF\u4EE3",
   "legend.claimed": "\u5DF2\u8BA4\u9886",
   "detail.intent": "\u610F\u56FE {id}",
@@ -836,6 +922,8 @@ var zh = {
 };
 var en = {
   "intent.invalidated": "Historical completion (invalidated)",
+  "returns.load": "Load full return",
+  "returns.more": "Show more",
   "returns.title": "Worker returns",
   "returns.unlinked": "Unlinked",
   "returns.pending": "Needs review",
@@ -875,6 +963,7 @@ var en = {
   "legend.goal": "Goal",
   "legend.fact": "Fact",
   "legend.open": "Exploring",
+  "kind.invalid": "Invalid evidence",
   "kind.superseded": "Superseded",
   "legend.claimed": "Claimed",
   "detail.intent": "Intent {id}",
@@ -887,11 +976,51 @@ var en = {
   "kind.fact": "Fact"
 };
 
+// src/storage-format.ts
+var STORAGE_FORMAT = "cairn-segments-v1";
+var SEGMENT_FIELDS = ["facts", "intents", "hints", "workerReturns"];
+var SEGMENT_PATH = /^\.dsh\/blackboard-segments\/[a-f0-9]{64}\.json$/;
+async function hydrateBoard(document2, read) {
+  if (document2.storageRevision !== document2.storageEndRevision) throw new Error("blackboard changed during paginated read; retry the snapshot");
+  if (!("storageFormat" in document2)) {
+    const { storageRevision: storageRevision2, storageEndRevision: storageEndRevision2, ...board2 } = document2;
+    return board2;
+  }
+  if (document2.storageFormat !== STORAGE_FORMAT) throw new Error("unsupported blackboard storage format");
+  const { storageFormat, storageRevision, storageEndRevision, segments, ...metadata } = document2;
+  const board = { ...metadata };
+  for (const field of SEGMENT_FIELDS) {
+    if (!Array.isArray(segments?.[field])) throw new Error("invalid blackboard segment index");
+    const records = [];
+    for (const ref of segments[field]) {
+      if (!SEGMENT_PATH.test(ref.path) || !Number.isSafeInteger(ref.count) || ref.count < 1 || ref.count > 256) throw new Error("invalid blackboard segment reference");
+      const values = JSON.parse(await read(ref.path));
+      if (!Array.isArray(values) || values.length !== ref.count) throw new Error("blackboard segment count mismatch");
+      records.push(...values);
+    }
+    ;
+    board[field] = records;
+  }
+  return board;
+}
+
 // src/client/rpc.ts
-async function loadBoardSnapshot(remote, sessionId, ownerId, signal) {
+var segmentCache = /* @__PURE__ */ new Map();
+var segmentCacheSize = 0;
+function cacheSegment(key, text) {
+  if (segmentCache.has(key) || text.length > 8 * 1024 * 1024) return;
+  segmentCache.set(key, text);
+  segmentCacheSize += text.length;
+  while (segmentCacheSize > 8 * 1024 * 1024 || segmentCache.size > 512) {
+    const oldest = segmentCache.keys().next().value;
+    segmentCacheSize -= segmentCache.get(oldest).length;
+    segmentCache.delete(oldest);
+  }
+}
+async function loadBoardSnapshot(remote, sessionId, ownerId2, signal) {
   let path;
   try {
-    path = boardRelativePath(ownerId);
+    path = boardRelativePath(ownerId2);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { kind: "error", message };
@@ -911,10 +1040,57 @@ async function loadBoardSnapshot(remote, sessionId, ownerId, signal) {
     }
     if (result.value.lines > 0) chunks.push(result.value.text);
     if (result.value.eof) break;
+    if (!Number.isSafeInteger(result.value.lines) || result.value.lines <= 0 || result.value.offset !== offset) {
+      return { kind: "error", message: "blackboard reader made no progress or returned an unexpected page" };
+    }
     offset += result.value.lines;
     if (offset > 1e6) return { kind: "error", message: "blackboard is too large to display" };
   }
-  return readBoardText(chunks.join("\n"));
+  const text = chunks.join("\n");
+  try {
+    const document2 = JSON.parse(text);
+    if (document2?.storageRevision !== document2?.storageEndRevision) throw new Error("blackboard changed during paginated read; retry the snapshot");
+    if (!document2?.storageFormat) return readBoardText(text);
+    const board = await hydrateBoard(document2, async (reference) => {
+      const key = `${sessionId}:${reference}`;
+      const cached = segmentCache.get(key);
+      if (cached !== void 0) return cached;
+      const parts = [];
+      let position = 1;
+      for (; ; ) {
+        const result = await remote.workspaceFiles.read(sessionId, reference, { offset: position }, signal);
+        if (!result.ok) throw new Error(result.error.message);
+        if (result.value.offset !== position) throw new Error("unexpected segment page");
+        parts.push(result.value.text);
+        if (result.value.eof) {
+          const content = parts.join("\n");
+          const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
+          const hash = Array.from(new Uint8Array(digest), (n) => n.toString(16).padStart(2, "0")).join("");
+          if (!reference.endsWith(`/${hash}.json`)) throw new Error("blackboard segment failed integrity check");
+          cacheSegment(key, content);
+          return content;
+        }
+        if (result.value.lines <= 0) throw new Error("segment reader made no progress");
+        position += result.value.lines;
+      }
+    });
+    return readBoardText(JSON.stringify(board));
+  } catch (error) {
+    return { kind: "error", message: error instanceof Error ? error.message : String(error) };
+  }
+}
+async function loadReturnText(remote, sessionId, path) {
+  if (!/^\.dsh\/blackboard-content\/[a-f0-9]{64}\.txt$/.test(path)) throw new Error("invalid return reference");
+  const chunks = [];
+  let offset = 1;
+  for (; ; ) {
+    const result = await remote.workspaceFiles.read(sessionId, path, { offset });
+    if (!result.ok) throw new Error(result.error.message);
+    chunks.push(result.value.text);
+    if (result.value.eof) return chunks.join("\n");
+    if (!result.value.lines) throw new Error("return reader made no progress");
+    offset += result.value.lines;
+  }
 }
 
 // src/client/styles.ts
@@ -1254,7 +1430,8 @@ function apply(ctx) {
       order: -10,
       locale: NS,
       inject: () => ({
-        readBoard: (sessionId, ownerId, signal) => loadBoardSnapshot(remote, sessionId, ownerId, signal)
+        readReturn: (sessionId, path) => loadReturnText(remote, sessionId, path),
+        readBoard: (sessionId, ownerId2, signal) => loadBoardSnapshot(remote, sessionId, ownerId2, signal)
       })
     }, BlackboardSidebarPanel)
   );

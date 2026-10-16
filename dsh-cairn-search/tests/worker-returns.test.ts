@@ -192,5 +192,5 @@ test('public snapshot/next reconcile status; reopen accepts feedback through the
   await assert.rejects(() => definition.execute({ op: 'reopen' }, exec), /feedback/)
   const result = await definition.execute({ op: 'reopen', description: 'verify again' }, exec)
   assert.equal(result.next.kind, 'reason')
-  assert.equal(result.board.intents.at(-1).invalidated.hintId, result.board.hints[0].id)
+  assert.equal((await loadBoard(cwd, 'p'))!.intents.at(-1)!.invalidated!.hintId, result.board.hints[0].id)
 }))

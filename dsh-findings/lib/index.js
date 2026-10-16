@@ -132,6 +132,85 @@ function mediaType(filename) {
 import { realpath as realpath2, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+
+// src/board-facts.ts
+import { createHash as createHash2 } from "node:crypto";
+import { parser } from "stream-json";
+import { pick } from "stream-json/filters/pick.js";
+import { streamArray } from "stream-json/streamers/stream-array.js";
+import chain, { none } from "stream-chain";
+async function readBoardFacts(root, path, ids, signal) {
+  const wanted = new Set(ids);
+  const found = /* @__PURE__ */ new Map();
+  const segments = [];
+  for await (const ref of records(root, path, "segments.facts", signal)) {
+    if (typeof ref?.path !== "string" || !/^\.dsh\/blackboard-segments\/[a-f0-9]{64}\.json$/.test(ref.path) || !Number.isSafeInteger(ref.count) || ref.count < 1 || ref.count > 256) throw new ArchiveError("invalid_manifest");
+    segments.push(ref);
+  }
+  async function* facts() {
+    if (!segments.length) {
+      yield* records(root, path, "facts", signal);
+      return;
+    }
+    for (const ref of segments) {
+      let count = 0;
+      for await (const fact of records(root, ref.path, "", signal, ref.path.split("/").at(-1).slice(0, 64))) {
+        count++;
+        yield fact;
+      }
+      if (count !== ref.count) throw new ArchiveError("invalid_manifest");
+    }
+  }
+  let bytes = 0;
+  {
+    for await (const fact of facts()) {
+      if (!wanted.has(fact?.id)) continue;
+      if (typeof fact.description !== "string") throw new ArchiveError("invalid_manifest");
+      bytes += Buffer.byteLength(fact.description, "utf8");
+      if (bytes > 1024 * 1024) throw new ArchiveError("payload_too_large", "Selected fact descriptions exceed the receipt budget");
+      found.set(fact.id, { id: fact.id, description: fact.description });
+    }
+    return [...wanted].map((id) => {
+      const fact = found.get(id);
+      if (!fact) throw new ArchiveError("invalid_manifest", `\u4E8B\u5B9E\u4E0D\u5B58\u5728\uFF1A${id}`);
+      return fact;
+    });
+  }
+}
+async function* records(root, path, filter, signal, expectedHash) {
+  const { child, completion } = reader(root, path, Number.MAX_SAFE_INTEGER, signal);
+  const hash = createHash2("sha256");
+  child.stdout.on("data", (data) => hash.update(data));
+  let string;
+  const packFactStrings = (token) => {
+    if (token.name === "startString") {
+      string = "";
+      return none;
+    }
+    if (token.name === "stringChunk" && string !== void 0) {
+      string += token.value ?? "";
+      if (string.length > 1024 * 1024) throw new ArchiveError("payload_too_large");
+      return none;
+    }
+    if (token.name === "endString" && string !== void 0) {
+      const value = string;
+      string = void 0;
+      return { name: "stringValue", value };
+    }
+    return token;
+  };
+  const stream = chain([child.stdout, parser({ packStrings: false }), ...filter ? [pick({ filter })] : [], packFactStrings, streamArray()]);
+  try {
+    for await (const entry of stream) yield entry.value;
+    await completion;
+    if (expectedHash && hash.digest("hex") !== expectedHash) throw new ArchiveError("invalid_manifest", "Fact segment failed integrity check");
+  } finally {
+    stream.destroy();
+    if (child.exitCode === null) child.kill();
+  }
+}
+
+// src/context.ts
 function encodeOwner(id) {
   if (!id.trim() || [".", ".."].includes(id.trim())) throw new ArchiveError("context_missing");
   return [...id.trim()].map(
@@ -175,20 +254,7 @@ async function sourceContext(ctx, exec, factIds, signal) {
   };
   if (factIds.length) {
     if (!resolved) throw new ArchiveError("context_missing", "\u7236\u94FE\u7F3A\u5931\uFF0C\u65E0\u6CD5\u53EF\u9760\u8BFB\u53D6\u5F15\u7528\u4E8B\u5B9E");
-    const board = JSON.parse(
-      (await readSafe(
-        root,
-        `.dsh/blackboards/${encodeOwner(current.id)}.json`,
-        1024 * 1024,
-        signal
-      )).toString()
-    );
-    source.fact_snapshots = [...new Set(factIds)].map((id) => {
-      const fact = board.facts?.find((f) => f.id === id);
-      if (!fact || typeof fact.description !== "string")
-        throw new ArchiveError("invalid_manifest", `\u4E8B\u5B9E\u4E0D\u5B58\u5728\uFF1A${id}`);
-      return { id, description: fact.description };
-    });
+    source.fact_snapshots = await readBoardFacts(root, `.dsh/blackboards/${encodeOwner(current.id)}.json`, factIds, signal);
   }
   try {
     const registry = JSON.parse(
@@ -209,7 +275,7 @@ async function sourceContext(ctx, exec, factIds, signal) {
 }
 
 // src/outbox.ts
-import { createHash as createHash2, randomUUID } from "node:crypto";
+import { createHash as createHash3, randomUUID } from "node:crypto";
 import { open as open2, rename, rm } from "node:fs/promises";
 import { basename, join as join2 } from "node:path";
 function canonical(value) {
@@ -239,7 +305,7 @@ async function loadOutbox(root, key, signal) {
     (await readSafe(root, join2(path, "manifest.json"), 1024 * 1024, signal)).toString()
   );
   const { submission_key, content_digest, ...content } = manifest;
-  if (submission_key !== key || content_digest !== key || createHash2("sha256").update(canonical(content)).digest("hex") !== key)
+  if (submission_key !== key || content_digest !== key || createHash3("sha256").update(canonical(content)).digest("hex") !== key)
     throw new ArchiveError("hash_mismatch", "\u5F85\u63D0\u4EA4\u6E05\u5355\u5B8C\u6574\u6027\u5F02\u5E38");
   return { path, manifest };
 }
@@ -289,7 +355,7 @@ async function prepareOutbox(args, source, signal) {
         occurrence_id: args.occurrence_id ?? null
       })
     );
-    const key = createHash2("sha256").update(canonical(content)).digest("hex");
+    const key = createHash3("sha256").update(canonical(content)).digest("hex");
     const manifest = { ...content, submission_key: key, content_digest: key };
     if (Buffer.byteLength(JSON.stringify(manifest)) > 1024 * 1024)
       throw new ArchiveError("payload_too_large");

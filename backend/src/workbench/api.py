@@ -14,7 +14,7 @@ from .findings_api import router as findings_router
 from .intel import IntelStore
 from .intel_api import router as intel_router
 from .approval import ApprovalManager
-from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard
+from .blackboards import BlackboardBadRequest, BlackboardNotFound, list_blackboards, read_blackboard, read_blackboard_return
 from .config import Settings, load_settings
 from .control import ControlPlane, new_id, utcnow
 from .egress import EGRESS_ID_HEADER, EGRESS_URL_HEADER, AttemptResult, rotate_http
@@ -364,6 +364,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def blackboard_file(workspace_id: str, owner_id: str) -> Dict[str, Any]:
         try:
             return read_blackboard(state().settings.dsh_home, workspace_id, owner_id)
+        except BlackboardBadRequest as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except BlackboardNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/blackboards/{workspace_id}/{owner_id}/returns/{return_id}")
+    def blackboard_return(workspace_id: str, owner_id: str, return_id: str) -> Dict[str, Any]:
+        try:
+            return read_blackboard_return(state().settings.dsh_home, workspace_id, owner_id, return_id)
         except BlackboardBadRequest as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except BlackboardNotFound as exc:

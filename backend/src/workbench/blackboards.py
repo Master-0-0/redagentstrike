@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 import json
+import hashlib
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +55,12 @@ def read_blackboard(dsh_home: Path, workspace_id: str, owner_id: str) -> Dict[st
     path = _board_file(Path(workspace["path"]), owner_id)
     try:
         text = path.read_text(encoding="utf-8")
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None  # Preserve malformed legacy text for the UI diagnostic.
+        if isinstance(payload, dict) and "storageFormat" in payload:
+            text = json.dumps(_hydrate_board(Path(workspace["path"]).expanduser().resolve(), payload), ensure_ascii=False)
     except OSError as exc:
         raise BlackboardNotFound("blackboard not found") from exc
     return {
@@ -61,6 +69,37 @@ def read_blackboard(dsh_home: Path, workspace_id: str, owner_id: str) -> Dict[st
         "path": str(path),
         "text": text,
     }
+
+
+def _hydrate_board(root: Path, board: Dict[str, Any]) -> Dict[str, Any]:
+    if board.get("storageFormat") != "cairn-segments-v1":
+        raise BlackboardBadRequest("unsupported blackboard storage format")
+    segments = board.get("segments")
+    if not isinstance(segments, dict):
+        raise BlackboardBadRequest("invalid blackboard segment index")
+    if board.get("storageRevision") != board.get("storageEndRevision"):
+        raise BlackboardBadRequest("blackboard manifest revision mismatch")
+    result = {key: value for key, value in board.items() if key not in {"storageFormat", "segments", "storageRevision", "storageEndRevision"}}
+    for field in ("facts", "intents", "hints", "workerReturns"):
+        refs = segments.get(field)
+        if not isinstance(refs, list):
+            raise BlackboardBadRequest("invalid blackboard segment index")
+        records = []
+        for ref in refs:
+            if not isinstance(ref, dict) or not isinstance(ref.get("path"), str) or not re.fullmatch(r"\.dsh/blackboard-segments/[a-f0-9]{64}\.json", ref["path"]):
+                raise BlackboardBadRequest("invalid blackboard segment reference")
+            path = root / ref["path"]
+            if not _contained(path, root):
+                raise BlackboardBadRequest("segment path outside workspace")
+            content = path.read_bytes()
+            if not ref["path"].endswith("/" + hashlib.sha256(content).hexdigest() + ".json"):
+                raise BlackboardBadRequest("blackboard segment failed integrity check")
+            values = json.loads(content)
+            if not isinstance(values, list) or not 1 <= len(values) <= 256 or len(values) != ref.get("count"):
+                raise BlackboardBadRequest("blackboard segment count mismatch")
+            records.extend(values)
+        result[field] = records
+    return result
 
 
 def _workspace_records(dsh_home: Path) -> List[Dict[str, str]]:
@@ -192,6 +231,16 @@ def _contained(child: Path, parent: Path) -> bool:
 
 def _board_preview(path: Path) -> Tuple[Optional[str], Optional[str]]:
     try:
+        info = path.stat()
+        return _cached_board_preview(str(path), info.st_mtime_ns, info.st_size)
+    except OSError:
+        return None, None
+
+
+@lru_cache(maxsize=256)
+def _cached_board_preview(filename: str, mtime_ns: int, size: int) -> Tuple[Optional[str], Optional[str]]:
+    path = Path(filename)
+    try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None, None
@@ -203,3 +252,26 @@ def _board_preview(path: Path) -> Tuple[Optional[str], Optional[str]]:
         title if isinstance(title, str) else None,
         status if isinstance(status, str) else None,
     )
+
+
+def read_blackboard_return(dsh_home: Path, workspace_id: str, owner_id: str, return_id: str) -> Dict[str, Any]:
+    """Read one archived return only after resolving it through its owner board."""
+    document = read_blackboard(dsh_home, workspace_id, owner_id)
+    board = json.loads(document["text"])
+    record = next((r for r in board.get("workerReturns", []) if r.get("id") == return_id), None)
+    if record is None:
+        raise BlackboardNotFound("worker return not found")
+    reference = record.get("contentRef")
+    if not reference:
+        return {"text": record.get("content", "")}
+    if not isinstance(reference, str) or not re.fullmatch(r"\.dsh/blackboard-content/[a-f0-9]{64}\.txt", reference):
+        raise BlackboardBadRequest("invalid return reference")
+    workspace = _workspace_by_id(dsh_home, workspace_id)
+    root = Path(workspace["path"]).resolve()
+    path = root / reference
+    if not _contained(path, root):
+        raise BlackboardBadRequest("return path outside workspace")
+    try:
+        return {"text": path.read_text(encoding="utf-8")}
+    except OSError as exc:
+        raise BlackboardNotFound("return content unavailable") from exc

@@ -9,6 +9,9 @@ export interface Fact {
 }
 
 export interface Intent {
+  readonly attempts?: number
+  readonly feedbackRevision?: number
+  readonly skills?: readonly string[]
   readonly id: string
   readonly from: readonly string[]
   readonly to: string | null
@@ -34,6 +37,8 @@ export interface Hint {
 }
 
 export interface WorkerReturn {
+  readonly contentRef?: string
+  readonly contentLength?: number
   readonly id: string
   readonly kind: 'return' | 'observation'
   readonly content: string
@@ -47,6 +52,7 @@ export interface WorkerReturn {
 }
 
 export interface ReasonLease {
+  readonly id?: string
   readonly worker: string
   readonly trigger: 'initial' | 'new-fact' | 'new-hint' | 'intents-empty'
   readonly startedAt: string
@@ -59,6 +65,9 @@ export interface Checkpoint {
 }
 
 export interface Board {
+  criteria?: { id: string; description: string }[]
+  protocolVersion?: 2
+  policy?: SearchPolicy
   title: string
   status: ProjectStatus
   bootstrapEnabled: boolean
@@ -70,6 +79,13 @@ export interface Board {
   pendingIntentsEmpty?: boolean
   workerStatusWarning?: string
   checkpoint: Checkpoint
+}
+
+export interface SearchPolicy {
+  maxOpenIntents: number
+  maxConcurrent: number
+  maxAttempts: number
+  maxExplorations: number
 }
 
 export type NextTask =

@@ -4,6 +4,8 @@ export const NS = 'blackboard'
 
 export const zh = {
   'intent.invalidated': '历史完成（已失效）',
+  'returns.load': '读取完整返回',
+  'returns.more': '显示更多',
   'returns.title': '子代理返回',
   'returns.unlinked': '未关联任务',
   'returns.pending': '待审核',
@@ -44,6 +46,7 @@ export const zh = {
   'legend.goal': '目标',
   'legend.fact': '事实',
   'legend.open': '探索中',
+  'kind.invalid': '证据已失效',
   'kind.superseded': '已替代',
   'legend.claimed': '已认领',
   'detail.intent': '意图 {id}',
@@ -58,6 +61,8 @@ export const zh = {
 
 export const en: Record<BlackboardKey, string> = {
   'intent.invalidated': 'Historical completion (invalidated)',
+  'returns.load': 'Load full return',
+  'returns.more': 'Show more',
   'returns.title': 'Worker returns',
   'returns.unlinked': 'Unlinked',
   'returns.pending': 'Needs review',
@@ -98,6 +103,7 @@ export const en: Record<BlackboardKey, string> = {
   'legend.goal': 'Goal',
   'legend.fact': 'Fact',
   'legend.open': 'Exploring',
+  'kind.invalid': 'Invalid evidence',
   'kind.superseded': 'Superseded',
   'legend.claimed': 'Claimed',
   'detail.intent': 'Intent {id}',

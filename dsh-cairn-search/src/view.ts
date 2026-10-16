@@ -4,6 +4,7 @@
  */
 
 import type { Board, Fact, Hint, Intent, ProjectStatus, ReasonLease, WorkerReturn } from './types.ts'
+import { invalidFactIds } from './evidence.ts'
 import { GOAL_ID, ORIGIN_ID } from './types.ts'
 
 const NODE_WIDTH = 240
@@ -17,6 +18,7 @@ const PAD = 40
 /** One fact or origin/goal node on the canvas. */
 export interface GraphNode {
   readonly id: string
+  readonly invalid?: boolean
   readonly supersededBy?: readonly string[]
   readonly kind: 'origin' | 'goal' | 'fact'
   readonly description: string
@@ -150,21 +152,44 @@ export function parseBoard(text: string): Board | null {
 export function layoutBoard(board: Board): BoardView {
   const columns = new Map<string, number>()
   columns.set(ORIGIN_ID, 0)
-  const visiting = new Set<string>()
-  const columnOf = (id: string): number => {
-    const held = columns.get(id)
-    if (held !== undefined) return held
-    if (visiting.has(id)) return 1
-    visiting.add(id)
-    const incoming = board.intents.filter((intent) => intent.to === id && !intent.invalidated)
-    const col = incoming.length === 0
-      ? 2
-      : 2 + Math.max(0, ...incoming.flatMap((intent) => intent.from.map((from) => columnOf(from))))
-    visiting.delete(id)
-    columns.set(id, col)
-    return col
+  const invalid = invalidFactIds(board)
+  const superseders = new Map<string, string[]>()
+  const dependencies = new Map<string, Set<string>>()
+  const outputs = new Map<string, Set<string>>()
+  const known = new Set(board.facts.map(f => f.id))
+  for (const fact of board.facts) {
+    for (const id of fact.supersedes ?? []) {
+      const list = superseders.get(id) ?? []
+      list.push(fact.id); superseders.set(id, list)
+    }
   }
-  for (const fact of board.facts) columnOf(fact.id)
+  for (const intent of board.intents) {
+    if (!intent.to || intent.invalidated || !known.has(intent.to)) continue
+    const deps = dependencies.get(intent.to) ?? new Set<string>()
+    for (const id of intent.from) {
+      if (!known.has(id)) continue
+      deps.add(id)
+      const list = outputs.get(id) ?? new Set<string>()
+      list.add(intent.to); outputs.set(id, list)
+    }
+    dependencies.set(intent.to, deps)
+  }
+  const remaining = new Map([...dependencies].map(([id, deps]) => [id, deps.size]))
+  const queue = board.facts.filter(f => f.id === ORIGIN_ID || !remaining.get(f.id)).map(f => f.id)
+  for (const id of queue) columns.set(id, id === ORIGIN_ID ? 0 : 2)
+  const heights = new Map<string, number>()
+  for (let index = 0; index < queue.length; index++) {
+    const id = queue[index]
+    for (const output of outputs.get(id) ?? []) {
+      heights.set(output, Math.max(heights.get(output) ?? 2, (columns.get(id) ?? 0) + 2))
+      remaining.set(output, (remaining.get(output) ?? 1) - 1)
+      if (remaining.get(output) === 0 && !columns.has(output)) {
+        columns.set(output, heights.get(output)!); queue.push(output)
+      }
+    }
+  }
+  // Malformed historical cycles remain displayable without recursive overflow.
+  for (const fact of board.facts) if (!columns.has(fact.id)) columns.set(fact.id, 2)
   const factColumns = board.facts.filter((fact) => fact.id !== GOAL_ID).map((fact) => columns.get(fact.id) ?? 1)
   const maxFactCol = factColumns.length === 0 ? 0 : Math.max(...factColumns)
   columns.set(GOAL_ID, Math.max(columns.get(GOAL_ID) ?? 2, maxFactCol + 2))
@@ -190,7 +215,8 @@ export function layoutBoard(board: Board): BoardView {
         id,
         kind: id === ORIGIN_ID ? 'origin' : id === GOAL_ID ? 'goal' : 'fact',
         description: fact.description,
-        supersededBy: board.facts.filter(f => f.supersedes?.includes(id)).map(f => f.id),
+        supersededBy: superseders.get(id) ?? [],
+        invalid: invalid.has(id),
         x: PAD + col * (NODE_WIDTH + COLUMN_GAP),
         y: PAD + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
@@ -275,12 +301,17 @@ export function layoutBoard(board: Board): BoardView {
  * @param text - workspace file contents; empty string is treated as missing.
  * @returns the panel's read result.
  */
+let lastText: string | undefined
+let lastRead: BoardRead | undefined
 export function readBoardText(text: string): BoardRead {
+  if (text === lastText && lastRead) return lastRead
   const trimmed = text.trim()
   if (trimmed === '') return { kind: 'missing' }
   const board = parseBoard(trimmed)
   if (board === null) return { kind: 'invalid', message: 'blackboard.json is not a valid board' }
-  return { kind: 'ready', view: layoutBoard(board) }
+  lastText = text
+  lastRead = { kind: 'ready', view: layoutBoard(board) }
+  return lastRead
 }
 
 /**
@@ -362,7 +393,7 @@ function parseReason(value: unknown): ReasonLease | null | undefined {
     && value.trigger !== 'new-hint'
     && value.trigger !== 'intents-empty'
   ) return undefined
-  return { worker: value.worker, trigger: value.trigger, startedAt: value.startedAt }
+  return { worker: value.worker, trigger: value.trigger, startedAt: value.startedAt, ...(typeof value.id === 'string' ? { id: value.id } : {}) }
 }
 
 function isStatus(value: unknown): value is ProjectStatus {
